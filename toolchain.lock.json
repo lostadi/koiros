@@ -1,0 +1,11 @@
+{
+  "schema": "koiros.toolchain/v1",
+  "compile_sdk": "35",
+  "build_tools": "35.0.0",
+  "java_distribution": "Temurin",
+  "java_version": "17.0.13+11",
+  "python_version": "3.12.8",
+  "java_release": 8,
+  "source_date_epoch": 315532800,
+  "note": "The CI reference recipe pins these versions. Each build also records SDK jar and tool fingerprints. Explicit alternate toolchains have their own reproducibility results."
+}

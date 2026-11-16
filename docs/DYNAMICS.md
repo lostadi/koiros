@@ -1,0 +1,14 @@
+# How Koiros evolves
+
+Each creature has a separate 48 by 64 toroidal Life grid, using B3/S23 and approximately 32% initial occupancy. Seeds are independently derived from the pond seed. All nine Life clocks advance from elapsed visible time at the selected rate, separately from display-synchronized drawing targeting 60 frames per second. Point density adapts to measured drawing cost with gradual recovery; the simulation clocks and all forms remain active. Grid Fourier bases and normalization are cached, adjacent fields blend once per frame, and completed morphs avoid unused formula evaluation.
+
+Every generation is projected onto eight spatial Fourier modes: `(1,0), (0,1), (1,1), (2,1), (1,2), (2,2), (3,1), (1,3)`. Coefficients are measured from the actual evolving cells and blend over 0.45 seconds. The resulting scalar projections and normalized flow fields change shape, motion, and light. Visual deformation follows a further gradual response controlled by Shape evolution, so individual Life updates do not abruptly reshape the creatures. Each creature's visual field mixes 76% of its own simulation with 24% of the next one's. The Life boards themselves remain independent.
+
+A shared curved current, weak neighbor attraction, and gentle circulation gradually rearrange the group while each creature retains its own swimming path. Their influence changes continuously, so collective motion develops without switching between preset formations. Drift controls the pace; slow settings let these changes unfold over tens of visible seconds.
+
+Measured Life activity, population, and spectral patterns combine with Lorenz state and speed to drive color cycling and form progression. A 48-hue neon palette produces cohesive gradients across each body. Eased transitions follow tours that visit all ten forms. The renderer blends the original point equations between forms. At zero pattern influence the geometry returns to the original Koi form; the simulation-driven palette remains active. The portrait composition, flow curves, soft light, and bounded history buffers provide depth and trails.
+
+The coupled Lorenz drive continues when a Life board settles. Its nine state variables are integrated together using fixed 1/120-second RK4 steps, with weak directed ring coupling. Life activity and density gently change its parameters. A watchdog recovers from nonfinite, runaway, or persistently stationary trajectories. The base equations are from [Lorenz (1963)](https://wind.mit.edu/~emanuel/Lorenz/EdLorenz/Deterministic_63.pdf); the coupling and Life integration are additions in this application.
+
+Empty boards renew after six seconds. Still or period-two patterns get a 24-second observation period; very old runs renew after 12 visible minutes. Renewals can be disabled. Rendering and evolution pause while hidden, without catching up across screen-off time. The application requests no network or calendar access.
+
