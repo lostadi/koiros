@@ -8,7 +8,9 @@ root = pathlib.Path.cwd()
 if not (root / "tools/verify_reproducible.py").is_file():
     raise RuntimeError("Run this Ostadix program from the Koiros repository root")
 python = os.environ.get("KOIROS_PYTHON", sys.executable)
-result = subprocess.run([python, "tools/verify_reproducible.py"], cwd=root)
+result = subprocess.run([python, "tools/verify_reproducible.py"], cwd=root, capture_output=True, text=True)
+(root / "dist").mkdir(exist_ok=True)
+(root / "dist/ostadix-build.log").write_text(result.stdout + result.stderr)
 if result.returncode:
     raise RuntimeError("Koiros build verification failed")
 __oval_result__ = {"ok": True, "report": "dist/reproducibility/reproducibility.json"}

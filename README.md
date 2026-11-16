@@ -6,7 +6,7 @@
 
 Living mathematics. Slow currents. Color that unfolds.
 
-[Download for Android](https://github.com/lostadi/koiros/releases/latest) · [Website](https://leoostadi.com/koiros/) · [Build it yourself](docs/BUILDING.md)
+[Download for Android](https://github.com/lostadi/koiros/releases/latest) · [Website](https://leeostadi.com/koiros/) · [Build it yourself](docs/BUILDING.md)
 
 </div>
 
@@ -21,6 +21,10 @@ Created by **Lee Daghlar Ostadi**, building on **Artificial Koi** by
 
 The name combines *koi* with *kairos*, the idea of the right or opportune
 moment—a name for forms unfolding in their own time.
+
+<p align="center"><img src="docs/images/koiros-render.jpg" width="280" alt="An actual Koiros simulation frame: luminous forms against a dark background"></p>
+
+*An offscreen Android render from the release verification, not a photograph of a phone.*
 
 ## Install and make it yours
 
