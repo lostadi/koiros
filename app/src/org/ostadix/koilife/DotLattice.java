@@ -57,13 +57,14 @@ public final class DotLattice {
     private static final double[] EXCLUSION = {1.6, 1.6, 1.52, 1.38, 1.24, 1.12, 1.0};
 
     // ---- Governing constants. Lengths in screen-short-side units, times in pond seconds. ----
-    double spacing = .025;
+    /** The lattice spacing in screen-short-side units, for drawing bounds. */
+    static final double SPACING_HINT = .025;
+    double spacing = SPACING_HINT;
     double coreFraction = .72, breakFraction = 1.85;
     double bondStiffness = 36, bondDamping = 2.5, coreStiffness = 90, exclusionStiffness = 18;
     /** Bonds at one dot repel in angle: chains straighten, three bonds open to 120 degrees, six to 60. */
     double bendStiffness = .12;
     double drag = 6;
-    double breathing = .15;
     double bondRate = 5, fragility = .35, restlessness = .6;
     double frequency = 3.7, frequencySpread = .12, syncCoupling = 2.4;
     double hueDiffusion = .7, hueMemory = 1 / 40.0;
@@ -80,11 +81,13 @@ public final class DotLattice {
     int fuseLinks = 4;
     /**
      * Swarmalator terms: drift up the near density (gather), more strongly up
-     * the density of dots in step (gatherInStep, the J of O'Keeffe, Ha and
+     * the density of dots in step (gatherInStep, the J of O'Keeffe, Hong and
      * Strogatz 2017), down the wide density (spread); rhythm is also pulled
      * toward the local mean rhythm (fieldSync).
      */
     double gather = .0025, gatherInStep = .0035, spread = .010, fieldSync = .9, waterSpeed = .02, jitter = .004;
+    /** How fast a dot in sparse surroundings swims toward the nearest crowd. */
+    double seek = .03;
     double wallMargin = .045, wallStiffness = 35, maxSpeed = .25;
     /** Within this distance of a wall a dot turns its heading inward and is eased away. */
     double wallZone = .14, wallTurn = 1.6, wallPush = .02;
@@ -98,12 +101,44 @@ public final class DotLattice {
      * the shared frequency), so which groups can lock together keeps changing.
      */
     final double[] lineageOmega = new double[LINEAGES];
+    /** Each lineage's genome wanders around where it began, so lineages never converge. */
+    final double[][] lineageGene = new double[4][LINEAGES], lineageBirth = new double[4][LINEAGES];
+    private static final double[] GENE_WANDER = {1.3, .15, .07, .35};
+    private static final double[] GENE_LOW = {1.6, .8, .04, .5}, GENE_HIGH = {6.4, 1.35, .3, 1.8};
     double rhythmWander = 15;
     final double[] hue = new double[MAX_DOTS], nativeHue = new double[MAX_DOTS];
     final double[] spin = new double[MAX_DOTS], nativeSpin = new double[MAX_DOTS];
     final double[] depth = new double[MAX_DOTS], nativeDepth = new double[MAX_DOTS];
     final double[] heading = new double[MAX_DOTS], alpha = new double[MAX_DOTS];
     final int[] valence = new int[MAX_DOTS], lineage = new int[MAX_DOTS];
+    /**
+     * The rules each dot carries, and changes as the system evolves. Each gene
+     * has an expressed value (used by the equations, shared along bonds) and a
+     * remembered one (inherited, learned slowly from what the dot became, and
+     * mutated a little, more in restless water). Each dot also adapts its genes
+     * toward what its surroundings favour: the local pattern of the Life world
+     * shifts the valence, bond length and swimming the water favours (crystal
+     * here, lace there), dots deep inside a body lean toward more bonds and rim
+     * dots toward fewer, and restless water strengthens breathing. Each
+     * lineage's genome also wanders on its own, and the world keeps evolving,
+     * partly seeded by the bodies, so the rules never settle into one kind.
+     */
+    final double[] geneValence = new double[MAX_DOTS], geneSpacing = new double[MAX_DOTS];
+    final double[] geneBreath = new double[MAX_DOTS], geneSwim = new double[MAX_DOTS];
+    final double[] memoryValence = new double[MAX_DOTS], memorySpacing = new double[MAX_DOTS];
+    final double[] memoryBreath = new double[MAX_DOTS], memorySwim = new double[MAX_DOTS];
+    private final double[] valenceSum = new double[MAX_DOTS], spacingSum = new double[MAX_DOTS];
+    private final double[] breathSum = new double[MAX_DOTS], swimSum = new double[MAX_DOTS];
+    private final double[] strainSum = new double[MAX_DOTS];
+    private final int[] neighbours = new int[MAX_DOTS];
+    /** Gene sharing along bonds, expression of memory, adaptation, learning (per pond second), mutation. */
+    double geneSharing = .4, geneExpression = 1 / 12.0, geneAdaptation = 1 / 10.0, geneLearning = 1 / 50.0;
+    double mutation = .03;
+    /**
+     * Valence stays structural (lacy rims are where bodies tear and divide);
+     * evolving it too made oversized bodies common in long runs.
+     */
+    boolean evolveValence = false;
     final boolean[] leaving = new boolean[MAX_DOTS];
     private final double[] fx = new double[MAX_DOTS], fy = new double[MAX_DOTS];
     private final double[] cosP = new double[MAX_DOTS], sinP = new double[MAX_DOTS];
@@ -141,7 +176,7 @@ public final class DotLattice {
     private double referenceDensity = 1;
 
     // ---- Water: the shared Life current and its restlessness, on a grid over the screen ----
-    private double[] waterX, waterY, waterTurbulence;
+    private double[] waterX, waterY, waterTurbulence, waterPattern;
     private int waterCols, waterRows;
     private double waterStrength = 1;
 
@@ -235,9 +270,15 @@ public final class DotLattice {
         double baseSpin = (identity % 2 == 0 ? 1 : -1) * (.65 + .35 * rand());
         int lineageIndex = Math.floorMod(identity, LINEAGES);
         lineageOmega[lineageIndex] = frequency * (1 + frequencySpread * (2 * rand() - 1));
+        double recipeMean = 0;
+        for (int v : recipe) recipeMean += v;
+        recipeMean /= recipe.length;
         double baseDepth = DEPTHS[Math.floorMod(identity, DEPTHS.length)];
         double basePhase = rand() * Math.PI * 2;
         double heading0 = rand() * Math.PI * 2;
+        double baseSpacing = .92 + .2 * rand(), baseBreath = .09 + .11 * rand(), baseSwim = .8 + .4 * rand();
+        double[] birth = {recipeMean + (rand() - .5), baseSpacing, baseBreath, baseSwim};
+        for (int k = 0; k < 4; k++) lineageGene[k][lineageIndex] = lineageBirth[k][lineageIndex] = birth[k];
         // An irregular start: a lumpy, stretched, tilted cloud, with part of
         // the group still loose in a trailing stream, so bodies assemble.
         double aspect = 1 + .8 * rand(), tilt = rand() * Math.PI, ct = Math.cos(tilt), st = Math.sin(tilt);
@@ -267,6 +308,10 @@ public final class DotLattice {
             vx[i] = vy[i] = 0;
             // Inner dots take the recipe's first (higher) valences, outer dots the last.
             valence[i] = recipe[Math.min(recipe.length - 1, k * recipe.length / Math.max(1, dots))];
+            memoryValence[i] = geneValence[i] = valence[i] + (rand() - .5) * .6;
+            memorySpacing[i] = geneSpacing[i] = baseSpacing;
+            memoryBreath[i] = geneBreath[i] = baseBreath;
+            memorySwim[i] = geneSwim[i] = baseSwim;
             nativeHue[i] = hue[i] = baseHue;
             nativeSpin[i] = spin[i] = baseSpin;
             nativeDepth[i] = depth[i] = baseDepth;
@@ -310,6 +355,8 @@ public final class DotLattice {
         waterX = flowX; waterY = flowY; waterTurbulence = turbulence;
         waterCols = columns; waterRows = rows; waterStrength = clamp(strength, 0, 2);
     }
+    /** The Life world's local pattern (its spectral projection, in [-1, 1]) on the same grid. */
+    public void setPattern(double[] projection) { waterPattern = projection; }
     public void setAttention(double px, double py, double strength) {
         if (!finite(px) || !finite(py) || !finite(strength)) { attentionStrength = 0; return; }
         attentionX = px; attentionY = py; attentionStrength = clamp(strength, -1, 1);
@@ -335,9 +382,14 @@ public final class DotLattice {
         dt = Math.min(dt, .12);
         time += dt;
         double tau = rhythmWander / rewire, sigma = frequency * frequencySpread;
+        double geneTau = 3 * rhythmWander / rewire;
         for (int l = 0; l < LINEAGES; l++) {
             lineageOmega[l] += -(lineageOmega[l] - frequency) * dt / tau
                 + sigma * Math.sqrt(2 * dt / tau) * (rand() - .5) * 3.4641016151377544;
+            for (int k = 0; k < 4; k++) {
+                lineageGene[k][l] = clamp(lineageGene[k][l] - (lineageGene[k][l] - lineageBirth[k][l]) * dt / geneTau
+                    + GENE_WANDER[k] * Math.sqrt(2 * dt / geneTau) * (rand() - .5) * 3.4641016151377544, GENE_LOW[k], GENE_HIGH[k]);
+            }
         }
         for (int i = 0; i < count; i++) {
             cosP[i] = Math.cos(phase[i]); sinP[i] = Math.sin(phase[i]);
@@ -346,6 +398,8 @@ public final class DotLattice {
             hueX[i] = Math.cos(h); hueY[i] = Math.sin(h);
             fx[i] = fy[i] = 0;
             weightSum[i] = syncSum[i] = hueSum[i] = spinSum[i] = headSum[i] = depthSum[i] = 0;
+            valenceSum[i] = spacingSum[i] = breathSum[i] = swimSum[i] = strainSum[i] = 0;
+            neighbours[i] = 0;
             restless[i] = turbulenceAt(x[i], y[i]);
             crowding[i] = fieldCols > 0 ? clamp((crowdingAt(x[i], y[i]) - quorumLevel) / quorumRange, 0, 1) : 0;
         }
@@ -422,6 +476,7 @@ public final class DotLattice {
         // Without collisions, dots of different lineages pass through each other.
         boolean apart = !collisions && lineage[i] != lineage[j];
         double f = 0, core = coreFraction * spacing;
+        if (d < 1.35 * spacing) { neighbours[i]++; neighbours[j]++; }
         if (d < core && !apart) f -= coreStiffness * (core - d);
         if (!bonded) {
             if (d < exclusion && !apart) f -= exclusionStiffness * (exclusion - d);
@@ -468,7 +523,10 @@ public final class DotLattice {
             double s = edgeStrength[e];
             if (d > 1e-9) {
                 double nx = dx / d, ny = dy / d;
-                double rest = spacing * (1 + breathing * .5 * (cosP[a] + cosP[b]));
+                double breath = .5 * (geneBreath[a] + geneBreath[b]);
+                double rest = spacing * .5 * (geneSpacing[a] + geneSpacing[b]) * (1 + breath * .5 * (cosP[a] + cosP[b]));
+                double strain = s * (d - rest) / rest;
+                strainSum[a] += strain; strainSum[b] += strain;
                 double closing = (vx[b] - vx[a]) * nx + (vy[b] - vy[a]) * ny;
                 double f = s * (bondStiffness * (d - rest) + bondDamping * closing);
                 fx[a] += f * nx; fy[a] += f * ny;
@@ -485,6 +543,12 @@ public final class DotLattice {
             headSum[a] += s * turn; headSum[b] -= s * turn;
             double depthDiff = depth[b] - depth[a];
             depthSum[a] += s * depthDiff; depthSum[b] -= s * depthDiff;
+            double gv = geneValence[b] - geneValence[a], gs = geneSpacing[b] - geneSpacing[a];
+            double gb = geneBreath[b] - geneBreath[a], gw = geneSwim[b] - geneSwim[a];
+            valenceSum[a] += s * gv; valenceSum[b] -= s * gv;
+            spacingSum[a] += s * gs; spacingSum[b] -= s * gs;
+            breathSum[a] += s * gb; breathSum[b] -= s * gb;
+            swimSum[a] += s * gw; swimSum[b] -= s * gw;
         }
     }
 
@@ -567,6 +631,7 @@ public final class DotLattice {
             hue[i] = wrapDegrees(hue[i] + dt * (hueDiffusion * hueSum[i] * norm
                 + hueMemory * arc(nativeHue[i] - hue[i])));
             spin[i] += dt * (spinDiffusion * spinSum[i] * norm + spinMemory * (nativeSpin[i] - spin[i]));
+            evolveGenes(i, dt, norm);
             depth[i] += dt * (depthDiffusion * depthSum[i] * norm + depthMemory * (nativeDepth[i] - depth[i]));
             heading[i] += dt * alignment * headSum[i] * norm + wander * Math.sqrt(dt) * (rand() - .5) * 2;
             // Near a wall: the inward normal, weighted by closeness.
@@ -609,15 +674,17 @@ public final class DotLattice {
             // Gather toward the density it senses, and harder toward dots in step.
             // Dots that hold more bonds gather harder, so dense cores sort inward
             // and lacy, low-valence dots make the rim (differential adhesion).
-            double cling = (.4 + .6 * valence[i] / 6.0) * (1 - quorumLoosen * crowding[i]);
+            // Dots with unused valence seek company harder, so loose dots rejoin.
+            double hunger = 1 + 1.2 * (1 - Math.min(1, degree[i] / (double) valence[i]));
+            double cling = (.4 + .6 * valence[i] / 6.0) * (1 - quorumLoosen * crowding[i]) * hunger;
             targetX += cling * (gather * nearX + gatherInStep * inStepX);
             targetY += cling * (gather * nearY + gatherInStep * inStepY);
             // Eased away from walls, so the middle of the screen is not left empty.
             targetX += wallPush * inX;
             targetY += wallPush * inY;
             // Swim along its heading.
-            targetX += swim * mood * cosH[i];
-            targetY += swim * mood * sinH[i];
+            targetX += swim * geneSwim[i] * mood * cosH[i];
+            targetY += swim * geneSwim[i] * mood * sinH[i];
             // The shared Life current.
             if (waterX != null) {
                 sampleWater(x[i], y[i]);
@@ -642,8 +709,18 @@ public final class DotLattice {
                 targetX += gatherStrength * .05 * (gatherX - x[i]);
                 targetY += gatherStrength * .05 * (gatherY - y[i]);
             }
-            double ax = fx[i] - spread * climate * wideX * drag;
-            double ay = fy[i] - spread * climate * wideY * drag;
+            // A dot whose own neighbourhood is sparse (a shed fragment) climbs
+            // toward the crowd it senses at long range instead of being pushed
+            // from it; a dot inside a body keeps the bodies apart.
+            double sparse = clamp(1 - value(near, gx, gy) / (.5 * referenceDensity), 0, 1);
+            double wideMagnitude = Math.sqrt(wideX * wideX + wideY * wideY);
+            if (sparse > 0 && wideMagnitude > 1e-9) {
+                double toward = Math.min(1, wideMagnitude / .3) / wideMagnitude;
+                targetX += sparse * seek * wideX * toward;
+                targetY += sparse * seek * wideY * toward;
+            }
+            double ax = fx[i] - (1 - sparse) * spread * climate * wideX * drag;
+            double ay = fy[i] - (1 - sparse) * spread * climate * wideY * drag;
             // Walls turn dots back softly.
             double left = -halfW + wallMargin, right = halfW - wallMargin;
             double top = -halfH + wallMargin, bottom = halfH - wallMargin;
@@ -668,6 +745,63 @@ public final class DotLattice {
         }
     }
 
+    /**
+     * How a dot's rules change: shared along bonds, expressed from memory,
+     * adapted to its experience, learned into memory, and mutated. Valence is
+     * the rounded gene; a dot holding more bonds than its new valence lets its
+     * most stretched bond go.
+     */
+    private void evolveGenes(int i, double dt, double norm) {
+        double adapt = geneAdaptation * rewire, noise = mutation * Math.sqrt(dt) * (1 + 2 * restless[i]) * 3.4641016151377544;
+        double pattern = patternAt(x[i], y[i]);
+        double inside = clamp(neighbours[i] - 4, -2, 2);
+        // What this dot's surroundings favour, around what it remembers.
+        double favouredValence = memoryValence[i] + 1.2 * pattern + .3 * inside;
+        double favouredSpacing = memorySpacing[i] - .08 * pattern;
+        double favouredBreath = memoryBreath[i] + .12 * (restless[i] - .3);
+        double favouredSwim = memorySwim[i] + .3 * pattern;
+        if (evolveValence) geneValence[i] = clamp(geneValence[i] + dt * (geneSharing * valenceSum[i] * norm
+            + adapt * (favouredValence - geneValence[i])), 1.6, 6.4);
+        geneSpacing[i] = clamp(geneSpacing[i] + dt * (geneSharing * spacingSum[i] * norm
+            + adapt * (favouredSpacing - geneSpacing[i])), .8, 1.35);
+        geneBreath[i] = clamp(geneBreath[i] + dt * (geneSharing * breathSum[i] * norm
+            + adapt * (favouredBreath - geneBreath[i])), .04, .3);
+        geneSwim[i] = clamp(geneSwim[i] + dt * (geneSharing * swimSum[i] * norm
+            + adapt * (favouredSwim - geneSwim[i])), .5, 1.8);
+        // Memory follows the lineage's wandering genome, learns what the dot became, and mutates.
+        double learn = geneLearning * dt, heredity = geneExpression * .3 * dt;
+        int l = lineage[i];
+        memoryValence[i] = clamp(memoryValence[i] + heredity * (lineageGene[0][l] - memoryValence[i])
+            + learn * (geneValence[i] - memoryValence[i]) + 2 * noise * (rand() - .5), 1.6, 6.4);
+        memorySpacing[i] = clamp(memorySpacing[i] + heredity * (lineageGene[1][l] - memorySpacing[i])
+            + learn * (geneSpacing[i] - memorySpacing[i]) + .25 * noise * (rand() - .5), .8, 1.35);
+        memoryBreath[i] = clamp(memoryBreath[i] + heredity * (lineageGene[2][l] - memoryBreath[i])
+            + learn * (geneBreath[i] - memoryBreath[i]) + .1 * noise * (rand() - .5), .04, .3);
+        memorySwim[i] = clamp(memorySwim[i] + heredity * (lineageGene[3][l] - memorySwim[i])
+            + learn * (geneSwim[i] - memorySwim[i]) + .3 * noise * (rand() - .5), .5, 1.8);
+        // The spin a dot remembers also follows what its body does.
+        nativeSpin[i] += learn * (spin[i] - nativeSpin[i]);
+        if (!evolveValence) return;
+        valence[i] = (int) Math.round(clamp(geneValence[i], 2, 6));
+        if (degree[i] > valence[i]) {
+            int alive = 0;
+            for (int k = 0; k < degree[i]; k++) if (!edgeDying[adjacent[i * MAX_BONDS + k]]) alive++;
+            for (; alive > valence[i]; alive--) releaseLongestBond(i);
+        }
+    }
+
+    private void releaseLongestBond(int i) {
+        int longest = -1; double best = -1;
+        for (int k = 0; k < degree[i]; k++) {
+            int e = adjacent[i * MAX_BONDS + k];
+            if (edgeDying[e]) continue;
+            int j = edgeA[e] == i ? edgeB[e] : edgeA[e];
+            double d = (x[j] - x[i]) * (x[j] - x[i]) + (y[j] - y[i]) * (y[j] - y[i]);
+            if (d > best) { best = d; longest = e; }
+        }
+        if (longest >= 0) edgeDying[longest] = true;
+    }
+
     private void removeDeparted() {
         for (int i = count - 1; i >= 0; i--) {
             if (!leaving[i] || alpha[i] > 0) continue;
@@ -688,6 +822,10 @@ public final class DotLattice {
         depth[to] = depth[from]; nativeDepth[to] = nativeDepth[from];
         heading[to] = heading[from]; alpha[to] = alpha[from];
         valence[to] = valence[from]; lineage[to] = lineage[from]; leaving[to] = leaving[from];
+        geneValence[to] = geneValence[from]; geneSpacing[to] = geneSpacing[from];
+        geneBreath[to] = geneBreath[from]; geneSwim[to] = geneSwim[from];
+        memoryValence[to] = memoryValence[from]; memorySpacing[to] = memorySpacing[from];
+        memoryBreath[to] = memoryBreath[from]; memorySwim[to] = memorySwim[from];
         bodyOf[to] = bodyOf[from];
         degree[to] = degree[from];
         for (int k = 0; k < degree[from]; k++) {
@@ -934,6 +1072,13 @@ public final class DotLattice {
         int k = iy * waterCols + ix;
         waterSampleX = bilinear(waterX, k, waterCols, tx, ty);
         waterSampleY = bilinear(waterY, k, waterCols, tx, ty);
+    }
+    private double patternAt(double px, double py) {
+        if (waterPattern == null) return 0;
+        double u = clamp(px / width + .5, 0, 1) * (waterCols - 1);
+        double v = clamp(py / height + .5, 0, 1) * (waterRows - 1);
+        int ix = Math.min(waterCols - 2, (int) u), iy = Math.min(waterRows - 2, (int) v);
+        return clamp(bilinear(waterPattern, iy * waterCols + ix, waterCols, u - ix, v - iy), -1, 1);
     }
     private double turbulenceAt(double px, double py) {
         if (waterTurbulence == null) return 0;

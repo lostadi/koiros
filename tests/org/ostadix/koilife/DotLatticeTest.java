@@ -23,6 +23,7 @@ public final class DotLatticeTest {
         releasedLineageFadesAndLeaves();
         paceStaysCalm();
         attentionDrawsDotsIn();
+        rulesEvolveWithTheSystem();
         stepAllocatesNothing();
         System.out.println("DotLatticeTest passed: " + checks + " checks");
     }
@@ -180,6 +181,34 @@ public final class DotLatticeTest {
         b.dots.setAttention(0, .4, 1);
         a.run(15); b.run(15);
         require(near(b.dots, 0, .4, .3) > near(a.dots, 0, .4, .3) + 20, "A touch draws dots toward it");
+    }
+
+    /** Each dot's rules (bond length, breathing, swimming) change as the system evolves, within bounds. */
+    private static void rulesEvolveWithTheSystem() {
+        Pond pond = new Pond(7, PER_BODY);
+        pond.run(5);
+        DotLattice d = pond.dots;
+        double[] start = java.util.Arrays.copyOf(d.geneSpacing, d.count);
+        pond.run(240);
+        double moved = 0;
+        for (int i = 0; i < d.count && i < start.length; i++) moved += Math.abs(d.geneSpacing[i] - start[i]);
+        require(moved / d.count > .015, "Bond-length genes move as the system evolves: " + moved / d.count);
+        double lineageShift = 0;
+        for (int l = 0; l < 7; l++) lineageShift += Math.abs(d.lineageGene[1][l] - d.lineageBirth[1][l]);
+        require(lineageShift / 7 > .01, "Lineage genomes wander: " + lineageShift / 7);
+        double sum = 0, square = 0; int bodies = 0;
+        for (int s = 0; s < d.bodyCount; s++) {
+            if (d.bodySize[s] < 60) continue;
+            double mean = 0; int n = 0;
+            for (int i = 0; i < d.count; i++) if (d.bodyOf[i] == d.bodyId[s]) { mean += d.geneSpacing[i]; n++; }
+            mean /= Math.max(1, n); sum += mean; square += mean * mean; bodies++;
+        }
+        double spread = bodies > 1 ? Math.sqrt(Math.max(0, square / bodies - (sum / bodies) * (sum / bodies))) : 0;
+        require(spread > .01, "Bodies keep different rules, not one kind: " + spread);
+        for (int i = 0; i < d.count; i++) {
+            require(d.geneSpacing[i] >= .8 && d.geneSpacing[i] <= 1.35 && d.geneBreath[i] >= .04 && d.geneBreath[i] <= .3
+                && d.geneSwim[i] >= .5 && d.geneSwim[i] <= 1.8, "Genes stay within their bounds");
+        }
     }
 
     private static void stepAllocatesNothing() {

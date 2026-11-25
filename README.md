@@ -55,6 +55,7 @@ The sliders reach **0.02×** for very gradual motion.
 - **Fusion and division without a script:** bodies that fall into step attract and knit together, and colour and rhythm average along the new bonds. When their rhythms can no longer stay locked they drift apart again, and quorum sensing loosens any body that grows too large.
 - **The whole screen:** bodies spread over all of it, start in a random arrangement every time, and look three-dimensional: near bodies larger and brighter, tilted like galaxies, with home-page parallax.
 - **Colour that flows:** a gradient across each body that drifts smoothly with the palette, and the hidden water carries colour between bodies.
+- **Rules that evolve:** each dot's bond length, breathing and swimming are genes that change with its body's history and surroundings, so shapes and pulses keep shifting.
 
 **Classic forms:**
 

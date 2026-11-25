@@ -41,11 +41,29 @@ public final class LatticeProbe {
         float[] prev = null;
         double dt = 1 / fps, t = 0, nextSample = 1;
         int frames = 0; double sim = 0, geo = 0, can = 0, worst = 0, bonded = 0;
+        // Lattice only: bond lengths as drawn, loose dots, and a tap's pull.
+        double longest = 0, loose = 0; int longFrames = 0, latticeFrames = 0;
+        double tapAt = seconds * .5, tapX = 0, tapY = 0; int nearBefore = -1, nearAfter6 = -1, nearAfter12 = -1;
         while (t < seconds) {
             r.render(canvas, frames == 0 ? 0 : dt);
             if (frames > 0) t += dt;
             frames++;
             sim += r.getSimulationCostMs(); geo += r.getGeometryCostMs(); can += r.getCanvasCostMs();
+            if (lattice && frames > 1) {
+                LatticeRenderer l = (LatticeRenderer) r;
+                double bond = l.getLongestBondPx();
+                longest = Math.max(longest, bond);
+                if (bond > 3 * .025 * Math.min(w, h)) longFrames++;
+                loose += l.getLooseFraction(); latticeFrames++;
+                DotLattice d = l.getLattice();
+                if (nearBefore < 0 && t >= tapAt) {
+                    tapX = 0; tapY = (.45 - .5) * d.getHeight();
+                    nearBefore = near(d, tapX, tapY);
+                    r.companionTouch(.5, .45, Pond.TOUCH_TAP);
+                }
+                if (nearAfter6 < 0 && nearBefore >= 0 && t >= tapAt + 6) nearAfter6 = near(d, tapX, tapY);
+                if (nearAfter12 < 0 && nearBefore >= 0 && t >= tapAt + 12) nearAfter12 = near(d, tapX, tapY);
+            }
             worst = Math.max(worst, r.getSimulationCostMs() + r.getGeometryCostMs());
             if (t >= nextSample) {
                 nextSample += 1;
@@ -90,5 +108,14 @@ public final class LatticeProbe {
             changeSum / Math.max(1, changeN), changePerLit / Math.max(1, changeN), r.getMergeCount(), r.getDivideCount(), lattice ? bonded / samples : -1);
         System.out.printf(Locale.US, "  cost ms: simulation=%.2f geometry=%.2f canvas(software)=%.2f worstSimGeo=%.2f points=%d links=%d shots=%d%n",
             sim / frames, geo / frames, can / frames, worst, r.getLastPointCount(), r.getLastLinkCount(), shots);
+        if (lattice) System.out.printf(Locale.US, "  longest drawn bond=%.0f px (rest ~%.0f); frames with a bond over 3 spacings=%.2f%%; loose dots=%.3f; tap at %.0fs: dots within 0.3 before=%d, +6s=%d, +12s=%d%n",
+            longest, .025 * Math.min(w, h), 100.0 * longFrames / Math.max(1, latticeFrames), loose / Math.max(1, latticeFrames),
+            tapAt, nearBefore, nearAfter6, nearAfter12);
+    }
+
+    private static int near(DotLattice d, double px, double py) {
+        int n = 0;
+        for (int i = 0; i < d.count; i++) if (Math.hypot(d.x[i] - px, d.y[i] - py) < .3) n++;
+        return n;
     }
 }

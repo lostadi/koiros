@@ -9,6 +9,9 @@
 - A three-dimensional look: near bodies larger and brighter (as with the Koi forms), bodies drawn as tilted domes, home-page parallax.
 - A random, irregular starting arrangement on every start; **New pond** gives a fresh one.
 - The lattice runs 1.5x faster than the classic forms at the same Drift.
+- Rules that evolve: each dot's bond length, breathing and swimming are genes that spread along bonds, are remembered and inherited through fusion and division, drift with each lineage, and lean toward what the hidden world favours.
+- Shed fragments seek the nearest crowd and dots with unused valence gather harder; fragments far from bodies are drawn small and dim.
+- The three-dimensional projection is a smooth field over the screen, so bonded neighbours never tear apart into long lines; fading bonds are not drawn.
 - Physics advances in fixed pond-time steps and drawing interpolates between them, so work follows Drift rather than the display rate.
 - **Classic forms** remains available under **Model**. With the lattice, **Merging** off makes dots bond only within their own lineage, **Collisions** off lets lineages pass through each other, and **Vary** lets crowding rise and fall with the chaotic drive.
 

@@ -64,6 +64,7 @@ public final class LatticeRenderer implements Pond {
     private final double[] fieldX = new double[GRID_SIZE], fieldY = new double[GRID_SIZE];
     private final double[] projection = new double[GRID_SIZE];
     private final double[] waterX = new double[GRID_SIZE], waterY = new double[GRID_SIZE];
+    private final double[] pattern = new double[GRID_SIZE];
     private final double[] flowX = new double[GRID_SIZE], flowY = new double[GRID_SIZE];
     private final double[] turbulence = new double[GRID_SIZE];
     private final double[] local = new double[2], rippleSample = new double[3];
@@ -84,6 +85,13 @@ public final class LatticeRenderer implements Pond {
     // bodies glide into one projection instead of jumping.
     private final double[] anchorX = new double[DotLattice.MAX_DOTS], anchorY = new double[DotLattice.MAX_DOTS];
     private final double[] anchorR = new double[DotLattice.MAX_DOTS];
+    private final double[] anchorDepth = new double[DotLattice.MAX_DOTS], anchorSpin = new double[DotLattice.MAX_DOTS];
+    private final double[] auraDepth = new double[DotLattice.MAX_BODIES], auraSpin = new double[DotLattice.MAX_BODIES];
+    private double longestBondPx, looseFraction;
+    private static final int FIELD_COLUMNS = 24, FIELD_ROWS = 52;
+    private final double[][] field = new double[6][FIELD_COLUMNS * FIELD_ROWS];
+    private final double[] projected = new double[6];
+    private boolean fieldReady;
     private final int[] dotTier = new int[DotLattice.MAX_DOTS];
     private final int[][] tierCounts = new int[TIERS][COLOR_BUCKETS], tierOffsets = new int[TIERS][COLOR_BUCKETS];
     private final int[][] tierCursor = new int[TIERS][COLOR_BUCKETS];
@@ -92,6 +100,7 @@ public final class LatticeRenderer implements Pond {
     private int savedVersion = -1, savedCount = -1;
     private int stepsThisFrame;
     private final int[] dotBucket = new int[DotLattice.MAX_DOTS];
+    private final boolean[] drawBond = new boolean[DotLattice.MAX_EDGES];
     private final boolean[] visibleDot = new boolean[DotLattice.MAX_DOTS], glowing = new boolean[DotLattice.MAX_DOTS];
     private final boolean[] bright = new boolean[DotLattice.MAX_DOTS];
     private final int[] glowCounts = new int[COLOR_BUCKETS], glowOffsets = new int[COLOR_BUCKETS];
@@ -278,17 +287,20 @@ public final class LatticeRenderer implements Pond {
         dots.setGathering((gatherU - .5) * unitsW, (gatherV - .5) * unitsH, gathering < .02 ? 0 : gathering);
         dots.setLiveliness(liveliness);
         dots.setClimate(varying ? climate : 1);
-        // A touch or a welcome lifts the pond's own pace a little, never past
-        // 1.8x the chosen Drift.
+        // A touch or a welcome lifts the pond's own pace by at most 1.8x; with
+        // the lattice's own 1.5x, that is at most 2.7x the chosen Drift.
         double pondDelta = elapsed * motionSpeed * PACE * (1 + .8 * engagement);
         pondAccumulator = Math.min(pondAccumulator + pondDelta, 40 * STEP);
         tiltClock += pondDelta * .35; axisClock += pondDelta * .18;
         stepsThisFrame = 0;
         while (pondAccumulator >= STEP) {
+            // At high Drift a frame's backlog is taken in at most about four
+            // steps of up to 0.1 pond seconds, which the equations tolerate.
+            double step = Math.min(.1, Math.max(STEP, pondAccumulator / 4));
             saveState();
-            updateWater(STEP / Math.max(1e-6, motionSpeed * PACE));
-            dots.step(STEP);
-            pondAccumulator -= STEP;
+            updateWater(step / Math.max(1e-6, motionSpeed * PACE));
+            dots.step(step);
+            pondAccumulator -= step;
             stepsThisFrame++;
         }
         if (dots.structureVersion != savedVersion || dots.getCount() != savedCount) saveState();
@@ -302,6 +314,8 @@ public final class LatticeRenderer implements Pond {
         simulationCostMs = (geometryStarted - started) / 1e6;
         updatePalette();
         measureBodies();
+        // Bodies barely move between physics steps; the field follows the steps.
+        if (stepsThisFrame > 0 || !fieldReady) { projectionField(); fieldReady = true; }
         boolean glow = pointBudget >= GLOW_BUDGET;
         int n = dots.getCount();
         Arrays.fill(glowCounts, 0);
@@ -310,26 +324,39 @@ public final class LatticeRenderer implements Pond {
         boolean freshAnchors = dots.structureVersion != anchorVersion || n != anchorCount;
         double follow = freshAnchors ? 1 : -Math.expm1(-elapsed / .45);
         anchorVersion = dots.structureVersion; anchorCount = n;
-        int drawnDots = 0;
+        int drawnDots = 0, looseDots = 0;
         for (int i = 0; i < n; i++) {
             visibleDot[i] = dots.alpha[i] > .35;
             int id = dots.bodyOf[i], slot = id >= 0 && id < slotOfId.length ? slotOfId[id] : -1;
             boolean inBody = slot >= 0 && auraCount[slot] > 0;
-            double targetX = inBody ? auraX[slot] : drawX[i], targetY = inBody ? auraY[slot] : drawY[i];
-            double targetR = inBody ? dots.bodyRadius[slot] * 1.7 : .03;
+            // The projection is a smooth field over the screen (see
+            // projectionField), so two bonded neighbours always get nearly
+            // the same transform, whichever body each belongs to.
+            sampleProjection(drawX[i], drawY[i]);
+            double presence = projected[5];
+            double targetX = drawX[i] + (projected[0] - drawX[i]) * presence;
+            double targetY = drawY[i] + (projected[1] - drawY[i]) * presence;
+            double targetR = .03 + (projected[2] - .03) * presence;
+            double targetDepth = dots.depth[i] + (projected[3] - dots.depth[i]) * presence;
+            double targetSpin = dots.spin[i] + (projected[4] - dots.spin[i]) * presence;
             anchorX[i] += (targetX - anchorX[i]) * follow;
             anchorY[i] += (targetY - anchorY[i]) * follow;
             anchorR[i] += (targetR - anchorR[i]) * follow;
+            anchorDepth[i] += (targetDepth - anchorDepth[i]) * follow;
+            anchorSpin[i] += (targetSpin - anchorSpin[i]) * follow;
+            if (!inBody) looseDots++;
             if (!visibleDot[i]) continue;
             // Three-dimensional illusion. A body is a domed disc tilted toward
             // or away from the viewer about an axis that slowly turns; nearer
             // bodies (depth, as in the Koi forms) are larger, and the near side
             // of each dome is larger and brighter.
-            double depth = dots.depth[i], radius = Math.max(.03, anchorR[i]);
+            // Tilt and depth scale come from the body's smoothed values, so a
+            // whole body, and a seam while two bodies fuse, projects as one piece.
+            double depth = anchorDepth[i], radius = Math.max(.03, anchorR[i]);
             double dx = drawX[i] - anchorX[i], dy = drawY[i] - anchorY[i];
             double z = radius * DOME * Math.sqrt(Math.max(0, 1 - (dx * dx + dy * dy) / (radius * radius)));
             double tilt = TILT * (.55 + .45 * Math.sin(tiltClock + 6.283 * depth));
-            double axis = axisClock + 1.7 * dots.spin[i];
+            double axis = axisClock + 1.7 * anchorSpin[i];
             double ca = Math.cos(axis), sa = Math.sin(axis), ct = Math.cos(tilt), st = Math.sin(tilt);
             double u = dx * ca + dy * sa, v = -dx * sa + dy * ca;
             double v2 = v * ct - z * st, z2 = v * st + z * ct;
@@ -337,7 +364,9 @@ public final class LatticeRenderer implements Pond {
             double px = (u * ca - v2 * sa) * scale, py = (u * sa + v2 * ca) * scale;
             screenX[i] = (float) (width * .5 + (anchorX[i] + px) * extent + PageDrift.pixelShift(pageCentered, depth, extent));
             screenY[i] = (float) (height * .5 + (anchorY[i] + py) * extent);
-            double nearness = depth + .35 * z2 / radius + .08 * (((i * 0.7548776662466927) % 1) - .5);
+            // Debris far from any body recedes into the smallest, dimmest class.
+            double nearness = (depth + .35 * z2 / radius) * (.35 + .65 * presence)
+                + .08 * (((i * 0.7548776662466927) % 1) - .5);
             int tier = nearness < .62 ? 0 : nearness < .86 ? 1 : 2;
             double c = Math.cos(drawPhase[i]);
             // Colour runs as a gradient across each body, diagonally and from
@@ -366,15 +395,27 @@ public final class LatticeRenderer implements Pond {
             if (glowing[i]) glowCounts[b] += 2;
             drawnDots++;
         }
+        looseFraction = n > 0 ? looseDots / (double) n : 0;
+        double maxBond = 2.6 * DotLattice.SPACING_HINT * extent;
+        double maxBondSquared = maxBond * maxBond;
         int links = 0;
+        double longest = 0;
         for (int e = 0; e < dots.edgeCount; e++) {
             int a = dots.edgeA[e], b = dots.edgeB[e];
-            if (!visibleDot[a] || !visibleDot[b]) continue;
-            double s = dots.edgeDying[e] ? .5 * dots.edgeStrength[e] : dots.edgeStrength[e];
+            drawBond[e] = false;
+            // A snapped bond is not drawn while it fades: it would stretch as the dots part.
+            if (!visibleDot[a] || !visibleDot[b] || dots.edgeDying[e]) continue;
+            double s = dots.edgeStrength[e];
             if (s < .08) continue;
+            double lx = screenX[b] - screenX[a], ly = screenY[b] - screenY[a];
+            // A bond is never drawn far longer than a lattice bond can be.
+            if (lx * lx + ly * ly > maxBondSquared) continue;
+            drawBond[e] = true;
             if (s >= .5) lineCounts[dotBucket[a]] += 4; else faintCounts[dotBucket[a]] += 4;
+            longest = Math.max(longest, lx * lx + ly * ly);
             links++;
         }
+        longestBondPx = Math.sqrt(longest);
         int pointOffset = 0, glowOffset = 0, lineOffset = 0, faintOffset = 0;
         for (int t = 0; t < TIERS; t++) {
             for (int b = 0; b < COLOR_BUCKETS; b++) {
@@ -396,10 +437,9 @@ public final class LatticeRenderer implements Pond {
         System.arraycopy(lineOffsets, 0, cursorA, 0, COLOR_BUCKETS);
         System.arraycopy(faintOffsets, 0, cursorB, 0, COLOR_BUCKETS);
         for (int e = 0; e < dots.edgeCount; e++) {
+            if (!drawBond[e]) continue;
             int a = dots.edgeA[e], b = dots.edgeB[e];
-            if (!visibleDot[a] || !visibleDot[b]) continue;
-            double s = dots.edgeDying[e] ? .5 * dots.edgeStrength[e] : dots.edgeStrength[e];
-            if (s < .08) continue;
+            double s = dots.edgeStrength[e];
             float[] target = s >= .5 ? lines : faintLines;
             int[] cursor = s >= .5 ? cursorA : cursorB;
             int bucket = dotBucket[a], p = cursor[bucket];
@@ -551,6 +591,7 @@ public final class LatticeRenderer implements Pond {
             for (int i = 0; i < GRID_SIZE; i++) {
                 waterX[i] += (bounded(fieldX[i], -1, 1) - waterX[i]) * follow;
                 waterY[i] += (bounded(fieldY[i], -1, 1) - waterY[i]) * follow;
+                pattern[i] += (bounded(projection[i], -1, 1) - pattern[i]) * follow;
             }
             waterReady = true;
         }
@@ -569,6 +610,51 @@ public final class LatticeRenderer implements Pond {
             }
         }
         dots.setWater(flowX, flowY, turbulence, GRID_X, GRID_Y, waterStrength);
+        dots.setPattern(pattern);
+    }
+
+    /**
+     * Blends the bodies' centres, sizes, depths and spins into smooth fields
+     * on a coarse grid, weighted by closeness and size. Far from every body
+     * the presence field falls to zero and dots are drawn untransformed.
+     */
+    private void projectionField() {
+        for (int gy = 0; gy < FIELD_ROWS; gy++) {
+            for (int gx = 0; gx < FIELD_COLUMNS; gx++) {
+                double px = (gx / (double) (FIELD_COLUMNS - 1) - .5) * unitsW, py = (gy / (double) (FIELD_ROWS - 1) - .5) * unitsH;
+                double weight = 0, bx = 0, by = 0, br = 0, bd = 0, bs = 0;
+                for (int k = 0; k < dots.bodyCount; k++) {
+                    if (auraCount[k] == 0) continue;
+                    double reach = dots.bodyRadius[k] * 1.7, ox = px - auraX[k], oy = py - auraY[k];
+                    double d2 = (ox * ox + oy * oy) / (reach * reach);
+                    if (d2 > 4) continue;
+                    double w = Math.exp(-2.2 * d2) * auraCount[k];
+                    weight += w; bx += w * auraX[k]; by += w * auraY[k]; br += w * reach;
+                    bd += w * auraDepth[k]; bs += w * auraSpin[k];
+                }
+                int c = gy * FIELD_COLUMNS + gx;
+                double inverse = weight > 1e-9 ? 1 / weight : 0;
+                field[0][c] = weight > 1e-9 ? bx * inverse : px;
+                field[1][c] = weight > 1e-9 ? by * inverse : py;
+                field[2][c] = weight > 1e-9 ? br * inverse : .03;
+                field[3][c] = bd * inverse;
+                field[4][c] = bs * inverse;
+                field[5][c] = Math.min(1, weight / 6);
+            }
+        }
+    }
+    private void sampleProjection(double px, double py) {
+        double u = bounded(px / unitsW + .5, 0, 1) * (FIELD_COLUMNS - 1), v = bounded(py / unitsH + .5, 0, 1) * (FIELD_ROWS - 1);
+        int ix = Math.min(FIELD_COLUMNS - 2, (int) u), iy = Math.min(FIELD_ROWS - 2, (int) v);
+        double tx = u - ix, ty = v - iy;
+        int c = iy * FIELD_COLUMNS + ix;
+        for (int q = 0; q < 6; q++) {
+            double[] f = field[q];
+            double top = f[c] + (f[c + 1] - f[c]) * tx, bottom = f[c + FIELD_COLUMNS] + (f[c + FIELD_COLUMNS + 1] - f[c + FIELD_COLUMNS]) * tx;
+            projected[q] = top + (bottom - top) * ty;
+        }
+        // Where the presence is low the blended depth and spin are undefined; keep them neutral.
+        if (projected[5] < 1e-6) { projected[3] = .7; projected[4] = 0; }
     }
 
     /** Each body's centre, from its drawn (interpolated) dots. */
@@ -577,15 +663,19 @@ public final class LatticeRenderer implements Pond {
         for (int slot = 0; slot < dots.bodyCount; slot++) {
             if (dots.bodyId[slot] >= 0 && dots.bodyId[slot] < slotOfId.length) slotOfId[dots.bodyId[slot]] = slot;
             auraX[slot] = auraY[slot] = 0; auraCount[slot] = 0;
+            auraDepth[slot] = auraSpin[slot] = 0;
         }
         for (int i = 0, n = dots.getCount(); i < n; i++) {
             int id = dots.bodyOf[i];
             if (id < 0 || id >= slotOfId.length || slotOfId[id] < 0) continue;
             int slot = slotOfId[id];
             auraX[slot] += drawX[i]; auraY[slot] += drawY[i]; auraCount[slot]++;
+            auraDepth[slot] += dots.depth[i]; auraSpin[slot] += dots.spin[i];
         }
         for (int slot = 0; slot < dots.bodyCount; slot++) {
-            if (auraCount[slot] > 0) { auraX[slot] /= auraCount[slot]; auraY[slot] /= auraCount[slot]; }
+            if (auraCount[slot] == 0) continue;
+            auraX[slot] /= auraCount[slot]; auraY[slot] /= auraCount[slot];
+            auraDepth[slot] /= auraCount[slot]; auraSpin[slot] /= auraCount[slot];
         }
     }
 
@@ -674,6 +764,10 @@ public final class LatticeRenderer implements Pond {
         return merged;
     }
     @Override public long getGeneration() { return world.getGeneration(); }
+    /** Longest bond drawn in the last frame, in pixels; bonds are about 32 px at rest on a phone. */
+    double getLongestBondPx() { return longestBondPx; }
+    /** Fraction of dots outside any body of fourteen or more in the last frame. */
+    double getLooseFraction() { return looseFraction; }
     public LifeField getLifeField() { return world; }
     DotLattice getLattice() { return dots; }
     public double getColorPhaseDegrees() { return colorPhase; }
