@@ -61,19 +61,22 @@ final class DayReader {
         // is hidden, so look a little earlier than the hide time.
         long start = Math.max(from - LEAD_MS, to - LONGEST_WINDOW_MS);
         Map<String, Long> resumed = new HashMap<>(), total = new HashMap<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
         UsageEvents events = usage.queryEvents(start, to);
         UsageEvents.Event event = new UsageEvents.Event();
         while (events != null && events.hasNextEvent()) {
             events.getNextEvent(event);
             String name = event.getPackageName();
             int type = event.getEventType();
+            boolean first = seen.add(name);
             if (type == 1) {            // ACTIVITY_RESUMED / MOVE_TO_FOREGROUND
                 resumed.put(name, event.getTimeStamp());
             } else if (type == 2 || type == 23) {  // ACTIVITY_PAUSED / ACTIVITY_STOPPED
                 Long began = resumed.remove(name);
-                // A pause with no recorded start began before the window:
-                // count it from when the pond was hidden.
-                long since = began != null ? began : from;
+                // Only a package whose very first event is a pause was already
+                // in front when the window began; count it from the hide time.
+                // A stop after a counted pause has no start and adds nothing.
+                long since = began != null ? began : first ? from : Long.MAX_VALUE;
                 if (event.getTimeStamp() > since) {
                     Long sum = total.get(name);
                     total.put(name, (sum == null ? 0L : sum) + (event.getTimeStamp() - since));

@@ -291,7 +291,19 @@ public final class KoiRenderer {
             tint.paint(u, v, 7 + 6 * weight, wrapDegrees(hue - 214 - colorPhase), .95 * weight);
             queueFlash(u, v, hue, .5 + .5 * weight);
         }
-        if (n > 0) engagement = Math.max(engagement, .6);
+        // The forms take on the day directly: each visible form leans part of
+        // the way toward one of the day's colours, then relaxes back toward its
+        // own over minutes. Colour in the unseen water alone would fade first.
+        int visible = 0;
+        for (int c = 0; c < MAX_CREATURES && n > 0; c++) {
+            if (pond.getOpacity(c) < .05) continue;
+            int k = visible++ % n;
+            if (!finite(hues[k])) continue;
+            double target = wrapDegrees(hues[k] - 214 - colorPhase);
+            hueIdentity[c] = wrapDegrees(hueIdentity[c]
+                + arc(target - hueIdentity[c]) * .55 * bounded(weights[k], .3, 1));
+        }
+        if (n > 0) engagement = Math.max(engagement, .4);
     }
     private void queueFlash(double u, double v, double hue, double size) {
         if (pendingCount >= MAX_PENDING_FLASHES) return;

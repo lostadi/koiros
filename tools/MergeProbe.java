@@ -47,7 +47,24 @@ public final class MergeProbe {
         int[][] apartRun = new int[9][9];
         double worstPhase = 0;
         StringBuilder timeline = new StringBuilder();
+        double[] hueAtDay = new double[9];
+        boolean toldDay = false;
+        String dayReport = "";
         while (time < seconds) {
+            if (!toldDay && time >= 30) {
+                for (int c = 0; c < 9; c++) hueAtDay[c] = renderer.getHueIdentity(c);
+                renderer.tellDay(new double[] {140, 20}, new double[] {1, .6}, 2);
+                toldDay = true;
+            }
+            if (toldDay && dayReport.isEmpty() && time >= 90) {
+                StringBuilder shift = new StringBuilder();
+                for (int c = 0; c < 9; c++) {
+                    if (renderer.getCreatureOpacity(c) < .05) continue;
+                    double d = Math.abs(((renderer.getHueIdentity(c) - hueAtDay[c]) % 360 + 540) % 360 - 180);
+                    shift.append(String.format(Locale.US, "%s%.0f", shift.length() == 0 ? "" : ", ", d));
+                }
+                dayReport = shift.toString();
+            }
             renderer.render(canvas, frames == 0 ? 0 : dt);
             time += frames == 0 ? 0 : dt;
             frames++;
@@ -120,6 +137,7 @@ public final class MergeProbe {
                 failHue, failPhase, failGroup, failForm, longestApart);
             report.printf(Locale.US, "  \"points\": %d,\n  \"world_generation\": %d,\n  \"world_population\": %d,\n",
                 renderer.getLastPointCount(), renderer.getLifeField().getGeneration(), renderer.getLifeField().getPopulation());
+            report.printf("  \"day_hue_shift_after_60s_degrees\": [%s],\n", dayReport);
             report.printf("  \"timeline\": [\n%s    {}\n  ]\n}\n", timeline);
         }
         System.out.println("MergeProbe wrote " + shots + " frames; merges=" + renderer.getMergeCount()
