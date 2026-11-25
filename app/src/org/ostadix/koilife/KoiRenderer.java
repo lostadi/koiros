@@ -42,6 +42,7 @@ public final class KoiRenderer {
     private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint flowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ripplePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint[] waterGlow = new Paint[2];
     private final Paint[] auraPaint = new Paint[MAX_CREATURES];
     private final Path flowPath = new Path();
     // Packed buffers keep palette resolution independent of memory/point budget.
@@ -114,6 +115,8 @@ public final class KoiRenderer {
     private boolean showField;
     private double simulationCostMs, geometryCostMs, canvasCostMs;
     private int lastLinkCount, lastPointCount;
+    /** Centered home-page offset. Zero keeps the pond still on a single page. */
+    private volatile double pageCentered;
 
     public KoiRenderer(long seed) {
         chaos = new CoupledChaos(seed);
@@ -143,6 +146,16 @@ public final class KoiRenderer {
         ripplePaint.setStyle(Paint.Style.STROKE);
         ripplePaint.setStrokeCap(Paint.Cap.BUTT);
         ripplePaint.setColor(Color.rgb(110, 210, 255));
+        // Fixed deep-water colors. Rebuilding a palette gradient every frame
+        // would allocate, and creature hues already carry the neon.
+        int[][] glows = {{22, 18, 52, 78}, {16, 24, 64, 58}};
+        for (int i = 0; i < waterGlow.length; i++) {
+            waterGlow[i] = new Paint(Paint.ANTI_ALIAS_FLAG);
+            int red = glows[i][1], green = glows[i][2], blue = glows[i][3];
+            waterGlow[i].setShader(new RadialGradient(0, 0, 1,
+                new int[] {Color.argb(glows[i][0], red, green, blue), Color.argb(0, red, green, blue)},
+                new float[] {0f, 1f}, Shader.TileMode.CLAMP));
+        }
         updatePalette();
     }
 
@@ -169,6 +182,15 @@ public final class KoiRenderer {
         visualHueArc = bounded(hueArcDegrees, 80, 140);
         visualGlow = bounded(glow, 0, 1.5);
     }
+    /**
+     * Launcher page position. A single page, or an unknown offset, leaves the
+     * pond where it is. The value is read on the next draw.
+     */
+    public void setPageOffset(double xOffset, double xOffsetStep,
+                              double xPixelOffset, double surfaceWidth) {
+        pageCentered = PageDrift.centeredOffset(xOffset, xOffsetStep, xPixelOffset, surfaceWidth);
+    }
+    public double getPageOffset() { return pageCentered; }
     /** A normalized screen tap; the service filters drags and multi-touch. */
     public void touch(double u, double v) {
         if (touchRipplesEnabled) touchRipples.touch(u, v);
@@ -271,7 +293,8 @@ public final class KoiRenderer {
             totalOpacity += opacity[c];
             encounterHue[c] = pond.getEncounterHueOffset(c);
             bodyFlowDistance[c] = extent * .018 * coupling * pond.getRadius(c) / .20;
-            centerX[c] = width * .5 + pond.getX(c) * extent;
+            centerX[c] = width * .5 + pond.getX(c) * extent
+                + PageDrift.pixelShift(pageCentered, pond.getDepth(c), extent);
             centerY[c] = height * .5 + pond.getY(c) * extent;
             sampleField(c, centerX[c] / width, centerY[c] / height, sample);
             frequency[c] = bounded(1 + coupling * (.18 * sample[2] + .035 * sample[0] + .07 * chaosState[c][0]), .72, 1.35);
@@ -345,7 +368,8 @@ public final class KoiRenderer {
             formCenterY[c] += (measuredY[c] - formCenterY[c]) * follow;
             formRadius[c] += (measuredRadius - formRadius[c]) * follow;
             formNormalized[c] = true;
-            scales[c] = extent * pond.getRadius(c) * visualCoreScale / Math.max(28, formRadius[c]);
+            scales[c] = extent * pond.getRadius(c) * visualCoreScale
+                * PageDrift.visualScale(pond.getDepth(c)) / Math.max(28, formRadius[c]);
         }
         // Hue follows the same spatial direction over the whole luminous body,
         // rather than alternating rainbow colors by its sample index.
@@ -425,6 +449,7 @@ public final class KoiRenderer {
         long canvasStarted = System.nanoTime();
         geometryCostMs = (canvasStarted - geometryStarted) / 1000000.0;
         canvas.drawColor(BACKGROUND);
+        drawWater(canvas, width, height, extent);
         drawAtmosphere(canvas, extent);
         drawTouchRipples(canvas, width, height);
         if (showField) drawSpectralFlow(canvas, width, height);
@@ -614,12 +639,28 @@ public final class KoiRenderer {
         double bottom = data[i + GRID_X] + (data[i + GRID_X + 1] - data[i + GRID_X]) * x;
         return top + (bottom - top) * y;
     }
+    private void drawWater(Canvas canvas, int width, int height, double extent) {
+        double phase = elapsedTime * PageDrift.waterRadiansPerSecond(motionSpeed);
+        double washShift = PageDrift.pixelShift(pageCentered, 0.15, extent);
+        for (int band = 0; band < waterGlow.length; band++) {
+            double along = 0.5 + 0.16 * Math.sin(phase * (0.70 + 0.12 * band) + band * 2.2);
+            double down = 0.34 + band * 0.32 + 0.04 * Math.sin(phase * 0.45 + band);
+            float radius = (float) (extent * 0.42);
+            int save = canvas.save();
+            canvas.translate((float) (along * width + washShift), (float) (down * height));
+            canvas.scale(radius, radius);
+            canvas.drawCircle(0, 0, 1, waterGlow[band]);
+            canvas.restoreToCount(save);
+        }
+    }
     private void drawAtmosphere(Canvas canvas, double extent) {
         for (int active = 0; active < activeCreatureCount; active++) {
             int c = activeCreatures[active];
-            float radius = (float) (extent * pond.getRadius(c) * (2.0 + .6 * energy[c]));
+            double depth = pond.getDepth(c);
+            float radius = (float) (extent * pond.getRadius(c) * (2.0 + .6 * energy[c]) * (0.70 + 0.45 * depth));
             int save = canvas.save(); canvas.translate((float) centerX[c], (float) centerY[c]);
-            canvas.scale(radius, radius * 1.28f); auraPaint[c].setAlpha((int) bounded(85 * opacity[c] * visualGlow, 0, 220));
+            canvas.scale(radius, radius * 1.28f);
+            auraPaint[c].setAlpha((int) bounded(85 * opacity[c] * visualGlow * (0.45 + 0.55 * depth), 0, 220));
             canvas.drawCircle(0, 0, 1, auraPaint[c]); canvas.restoreToCount(save);
         }
     }

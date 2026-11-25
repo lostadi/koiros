@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="wallpaper_description">Artificial Koi shaped by evolving Game of Life frequency fields.</string>
+    <string name="wallpaper_description">Living forms at different depths, shaped by evolving Game of Life frequency fields.</string>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#7ED8CD</item>

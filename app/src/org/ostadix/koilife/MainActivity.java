@@ -211,6 +211,7 @@ public final class MainActivity extends Activity {
             + "Koiros combines Artificial Koi’s original point equations with Conway’s Game of Life. "
             + "One to nine creatures morph through ten original Artificial Koi forms, with 48 neon hues forming cohesive spatial gradients that shift gradually across each body. Nine independently seeded Life runs, their measured frequencies, and coupled chaotic systems drive the pond. "
             + "Use Drift, Shape evolution, and Color drift to give the pond a slower, calmer pace. The pond pauses when the wallpaper is hidden.\n\n"
+            + "Each creature has a fixed depth: nearer ones are larger, and they shift a little farther when you swipe between home pages. Two soft pools of light move slowly in the water behind them.\n\n"
             + "Artificial Koi — Mathew Molt and credited contributors, GPL-3.0-or-later.\n"
             + "GoL Screensaver — Harold Martin, MIT.\n"
             + "Created by Lee Daghlar Ostadi. Simulation integration built and checked using Ostadix MCP.\n\n"

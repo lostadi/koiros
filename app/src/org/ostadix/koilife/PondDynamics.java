@@ -13,6 +13,13 @@ public final class PondDynamics {
     private static final double STEP = 1.0 / 120.0;
     private static final double FADE_SECONDS = 1.5;
     private static final double MAX_SPEED = 0.23;
+    /**
+     * Fixed visual depth for the nine pooled bodies. 1 is nearest.
+     * Swimming, collisions, and the shared radius do not read this.
+     */
+    private static final double[] DEPTH = {
+        1.00, 0.46, 0.78, 0.58, 0.40, 0.88, 0.66, 0.94, 0.52
+    };
     private final double[] x = new double[MAX_CREATURES];
     private final double[] y = new double[MAX_CREATURES];
     private final double[] vx = new double[MAX_CREATURES];
@@ -103,6 +110,8 @@ public final class PondDynamics {
     public double getX(int creature) { return x[creature]; }
     public double getY(int creature) { return y[creature]; }
     public double getRadius(int creature) { return radius; }
+    /** Stable visual depth in [0.40, 1]. Motion does not change it. */
+    public double getDepth(int creature) { return DEPTH[creature]; }
     public double getOpacity(int creature) { return opacity[creature]; }
     /** Continuous encounter tint in degrees, bounded to [-24,24]. */
     public double getEncounterHueOffset(int creature) { return encounterHue[creature]; }

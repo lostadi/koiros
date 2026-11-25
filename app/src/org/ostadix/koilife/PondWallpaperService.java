@@ -80,6 +80,12 @@ public final class PondWallpaperService extends WallpaperService {
             choreographer.removeFrameCallback(this);
             scheduled = false;
         }
+        @Override public void onOffsetsChanged(float xOffset, float yOffset,
+                float xOffsetStep, float yOffsetStep, int xPixelOffset, int yPixelOffset) {
+            if (renderer == null) return;
+            renderer.setPageOffset(xOffset, xOffsetStep, xPixelOffset,
+                getSurfaceHolder().getSurfaceFrame().width());
+        }
         @Override public void onVisibilityChanged(boolean nowVisible) {
             visible = nowVisible;
             resetTiming(); cancel();

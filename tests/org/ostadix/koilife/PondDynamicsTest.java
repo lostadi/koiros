@@ -14,6 +14,7 @@ public final class PondDynamicsTest {
         gradualCollectiveStructure();
         encounterHueExchange();
         encounterKinematicsBaseline();
+        visualDepthStaysOutOfTheMotion();
         System.out.println("PondDynamicsTest passed: " + checks + " checks");
     }
 
@@ -317,6 +318,30 @@ public final class PondDynamicsTest {
                 near(pond.velocityYForTest(i), expected[scenario][i][3], 1e-9, "Encounter hue changed baseline Y velocity");
             }
         }
+    }
+
+    private static void visualDepthStaysOutOfTheMotion() {
+        PondDynamics pond = new PondDynamics(61L);
+        double[] depth = new double[9];
+        double low = 1, high = 0;
+        for (int i = 0; i < 9; i++) {
+            depth[i] = pond.getDepth(i);
+            require(depth[i] >= 0.40 && depth[i] <= 1.0, "Depth outside the school range");
+            low = Math.min(low, depth[i]);
+            high = Math.max(high, depth[i]);
+        }
+        require(high - low >= 0.50, "Depths are too alike to read as a school");
+        double[][] before = snapshot(pond);
+        pond.configure(7, true, true);
+        for (int i = 0; i < 40; i++) pond.advance(0.5, 1, 2, null);
+        for (int i = 0; i < 9; i++) near(pond.getDepth(i), depth[i], 0, "Motion or settings changed depth");
+        require(Math.abs(pond.getX(0) - before[0][0]) + Math.abs(pond.getY(0) - before[0][1]) > 0.01,
+                "The depth check did not actually advance the pond");
+        PondDynamics otherSeed = new PondDynamics(999L);
+        for (int i = 0; i < 9; i++) near(otherSeed.getDepth(i), depth[i], 0, "Depth depended on the pond seed");
+        // The three bodies shown before any fade already sit at different depths.
+        require(pond.getDepth(0) != pond.getDepth(1) && pond.getDepth(1) != pond.getDepth(2)
+                && pond.getDepth(0) != pond.getDepth(2), "The opening three share a depth");
     }
 
     private static PondDynamics headOn(boolean collisions) {
