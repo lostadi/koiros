@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0 — The emergent lattice
+
+- New default model, **Emergent lattice**: the pond reduced to the equations each dot obeys. Dots bond up to their valence, more readily when in step and alike in colour; bonds are springs that breathe with the rhythm and snap when stretched or out of step; rhythm, colour, spin, depth and heading spread along bonds; each dot gathers toward dots in step with it (swarmalator coupling), circles the density it feels, swims, drifts in the hidden Life current, and senses crowding (quorum). Bodies, crystal cores and lacy rims, spiral arms, synchrony, fusion and division emerge; nothing above the dot is scripted. See [How Koiros evolves](docs/DYNAMICS.md).
+- Every line is a bond between two dots: hairlines a third of a dot's width. No free-floating threads; fusion and division flashes are soft glows without rings.
+- Uses the whole screen: bodies spread over it, including the top and bottom.
+- Colour runs as a gradient across each body and flows smoothly as the palette drifts.
+- A three-dimensional look: near bodies larger and brighter (as with the Koi forms), bodies drawn as tilted domes, home-page parallax.
+- A random, irregular starting arrangement on every start; **New pond** gives a fresh one.
+- The lattice runs 1.5x faster than the classic forms at the same Drift.
+- Physics advances in fixed pond-time steps and drawing interpolates between them, so work follows Drift rather than the display rate.
+- **Classic forms** remains available under **Model**. With the lattice, **Merging** off makes dots bond only within their own lineage, **Collisions** off lets lineages pass through each other, and **Vary** lets crowding rise and fall with the chaotic drive.
+
 ## 2.0 — One shared world
 
 - All forms now live in one shared Game of Life world instead of nine private boards. They sense it locally, seed life in their wake, and swim in one measured current.

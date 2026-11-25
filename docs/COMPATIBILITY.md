@@ -33,6 +33,6 @@ Android may back up and restore the app's preferences according to your system b
 
 ## Verification scope
 
-The repository runs six pure Java model test suites and builds twice to compare APK bytes. Those checks cover simulation invariants and build repeatability, not every manufacturer's wallpaper picker, launcher, graphics driver, or battery policy. The release notes identify the device checks performed for each published version.
+The repository runs eleven pure Java model test suites and builds twice to compare APK bytes. Those checks cover simulation invariants and build repeatability, not every manufacturer's wallpaper picker, launcher, graphics driver, or battery policy. The release notes identify the device checks performed for each published version.
 
 The manifest currently targets API 34. This release is intended for direct APK installation from GitHub; a Play Store submission is a separate distribution process with its own current requirements.

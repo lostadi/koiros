@@ -25,7 +25,7 @@ import java.util.Arrays;
  * they render as one larger body; after dividing, each keeps part of what it
  * shared. No allocations occur per frame.
  */
-public final class KoiRenderer {
+public final class KoiRenderer implements Pond {
     private static final int MAX_CREATURES = 9, COLOR_BUCKETS = 48, MAX_POINTS = 14000;
     private static final int MAX_LINKS = 900;
     private static final int GRID_X = 13, GRID_Y = 19, GRID_SIZE = GRID_X * GRID_Y;
@@ -386,6 +386,7 @@ public final class KoiRenderer {
     }
     /** The one shared Life world. */
     public LifeField getLifeField() { return world; }
+    @Override public long getGeneration() { return world.getGeneration(); }
     /** Every body lives in the same world. */
     public LifeField getLifeField(int creature) { return world; }
     public double getColorPhaseDegrees() { return colorPhase; }

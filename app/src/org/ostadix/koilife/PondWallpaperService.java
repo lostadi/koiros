@@ -57,7 +57,7 @@ public final class PondWallpaperService extends WallpaperService {
         private float petDownX, petDownY;
         private boolean petTracking;
         private Settings settings;
-        private KoiRenderer renderer;
+        private Pond renderer;
         private boolean visible, surfaceReady, destroyed, scheduled;
         private long lastNanos, lastFrameTime, seed, frames, windowStart;
         private int windowFrames;
@@ -74,7 +74,7 @@ public final class PondWallpaperService extends WallpaperService {
             settings = new Settings(PondWallpaperService.this);
             power = (PowerManager) getSystemService(Context.POWER_SERVICE);
             seed = settings.seed();
-            renderer = new KoiRenderer(seed);
+            renderer = settings.createPond(seed);
             settings.configure(renderer);
             settings.prefs.registerOnSharedPreferenceChangeListener(this);
             // Companion memory lives apart from the settings, so remembering
@@ -163,7 +163,7 @@ public final class PondWallpaperService extends WallpaperService {
                 lastHiddenAt = System.currentTimeMillis();
                 remember();
             }
-            Log.i("KoiLife", "Visibility=" + visible + "; generation=" + renderer.getLifeField().getGeneration());
+            Log.i("KoiLife", "Visibility=" + visible + "; generation=" + renderer.getGeneration());
         }
         @Override public void onSurfaceDestroyed(SurfaceHolder holder) {
             surfaceReady = false; resetTiming(); cancel();
@@ -224,7 +224,15 @@ public final class PondWallpaperService extends WallpaperService {
         @Override public void onSharedPreferenceChanged(SharedPreferences p, String key) {
             if (destroyed) return;
             tapPointer = -1;
-            if (settings.seed() != seed) {
+            if (settings.modelChanged(renderer)) {
+                // Switching models starts the chosen pond fresh and keeps the companion's memory.
+                double kept = renderer.getAffection(), mood = renderer.getLiveliness();
+                seed = settings.seed();
+                renderer = settings.createPond(seed);
+                renderer.setAffection(kept); renderer.setMood(mood);
+                resetTiming();
+                Log.i("KoiLife", "Model=" + (settings.lattice() ? "lattice" : "classic"));
+            } else if (settings.seed() != seed) {
                 seed = settings.seed(); renderer.reseed(seed); resetTiming();
             }
             settings.configure(renderer);
@@ -285,7 +293,7 @@ public final class PondWallpaperService extends WallpaperService {
                 int width = holder.getSurfaceFrame().width(), height = holder.getSurfaceFrame().height();
                 if (width > 0 && height > 0) {
                     markInteraction();
-                    renderer.companionTouch(x / (double) width, y / (double) height, KoiRenderer.TOUCH_TAP);
+                    renderer.companionTouch(x / (double) width, y / (double) height, Pond.TOUCH_TAP);
                     schedule();
                 }
             }
@@ -301,7 +309,7 @@ public final class PondWallpaperService extends WallpaperService {
             if (action == MotionEvent.ACTION_DOWN && event.getPointerCount() == 1) {
                 petTracking = true; petDownX = event.getX(); petDownY = event.getY();
                 petDownTime = event.getEventTime();
-                renderer.companionTouch(u, v, KoiRenderer.TOUCH_DOWN);
+                renderer.companionTouch(u, v, Pond.TOUCH_DOWN);
             } else if (!petTracking) {
                 return;
             } else if (action == MotionEvent.ACTION_MOVE) {
@@ -309,19 +317,19 @@ public final class PondWallpaperService extends WallpaperService {
                 double travel = Math.hypot(event.getX() - petDownX, event.getY() - petDownY);
                 if (travel / held * 1000.0 > width * 1.2) {
                     petTracking = false;  // a swipe, not a touch meant for the pond
-                    renderer.companionTouch(u, v, KoiRenderer.TOUCH_UP);
+                    renderer.companionTouch(u, v, Pond.TOUCH_UP);
                 } else {
-                    renderer.companionTouch(u, v, KoiRenderer.TOUCH_MOVE);
+                    renderer.companionTouch(u, v, Pond.TOUCH_MOVE);
                 }
             } else if (action == MotionEvent.ACTION_UP) {
                 petTracking = false;
                 // A raw touch only draws a glance; affection comes from taps on
                 // empty wallpaper, which the launcher reports via onCommand.
-                renderer.companionTouch(u, v, KoiRenderer.TOUCH_UP);
+                renderer.companionTouch(u, v, Pond.TOUCH_UP);
                 schedule();
             } else if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_POINTER_DOWN) {
                 petTracking = false;
-                renderer.companionTouch(u, v, KoiRenderer.TOUCH_UP);
+                renderer.companionTouch(u, v, Pond.TOUCH_UP);
             }
         }
         private boolean insideSurface(float x, float y, int width, int height) {
@@ -385,7 +393,7 @@ public final class PondWallpaperService extends WallpaperService {
                 lockMs = (System.nanoTime() - lockStart) / 1e6;
                 if (canvas != null) {
                     hardware = canvas.isHardwareAccelerated();
-                    // A sleepy pond on a low battery also draws fewer points.
+                    // A sleepy pond on a low battery also draws less.
                     renderer.setPointBudget(sleepy ? Math.min(8000, budget.getPointCount()) : budget.getPointCount());
                     renderer.render(canvas, dt);
                     frames++; drawn = true;
@@ -415,16 +423,17 @@ public final class PondWallpaperService extends WallpaperService {
                 double seconds = (start - windowStart) / 1e9;
                 if (seconds >= 2) {
                     Log.i("KoiLife", String.format(Locale.US,
-                        "frames=%d; fps=%.1f; drawMs=%.2f; worstMs=%.2f; points=%d; rate=%d; generation=%d; lockMs=%.2f; simulationMs=%.2f; geometryMs=%.2f; canvasMs=%.2f; postMs=%.2f; hwFrames=%d/%d; drawnPoints=%.0f; links=%.0f; maxCount=%d; field=%s; pace=%s; display=%.0f; merges=%d; divides=%d; mergedBodies=%d; mood=%.2f; affection=%.2f",
+                        "frames=%d; fps=%.1f; drawMs=%.2f; worstMs=%.2f; points=%d; rate=%d; generation=%d; lockMs=%.2f; simulationMs=%.2f; geometryMs=%.2f; canvasMs=%.2f; postMs=%.2f; hwFrames=%d/%d; drawnPoints=%.0f; links=%.0f; maxCount=%d; field=%s; pace=%s; display=%.0f; merges=%d; divides=%d; mergedBodies=%d; mood=%.2f; affection=%.2f; model=%s",
                         frames, (windowFrames - 1) / seconds, windowCost / windowFrames,
-                        windowWorst, renderer.getPointCount(), settings.rate(), renderer.getLifeField().getGeneration(),
+                        windowWorst, renderer.getPointCount(), settings.rate(), renderer.getGeneration(),
                         windowLock / windowFrames, windowSimulation / windowFrames,
                         windowGeometry / windowFrames, windowCanvas / windowFrames,
                         windowPost / windowFrames, windowHardwareFrames, windowFrames,
                         windowPoints / (double) windowFrames, windowLinks / (double) windowFrames,
                         settings.count(), settings.field(), powerSave ? "saver" : sleepy ? "sleepy" : idle ? "idle" : "active",
                         requestedRate, renderer.getMergeCount(), renderer.getDivideCount(),
-                        renderer.getMergedBodyCount(), renderer.getLiveliness(), renderer.getAffection()));
+                        renderer.getMergedBodyCount(), renderer.getLiveliness(), renderer.getAffection(),
+                        renderer instanceof LatticeRenderer ? "lattice" : "classic"));
                     resetWindow();
                 }
             }

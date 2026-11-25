@@ -11,11 +11,13 @@ Living mathematics. Slow currents. Color that unfolds.
 </div>
 
 Koiros turns an Android background into a small, continuously evolving world.
-Luminous forms share one living Game of Life world: they drift in the same
-currents, fuse into a single body, divide again, and leave their colour in the
-water for others to find. Neon gradients travel gently across their bodies.
-Each scene grows from that shared world, its frequency projections, and coupled
-chaotic dynamics.
+In its default model every glowing dot obeys the same few equations: it bonds
+to nearby dots up to its valence, keeps a rhythm with the dots it is bonded to,
+gathers toward dots in step with it, circles, swims, and drifts in the current
+of a hidden Game of Life world. Lattice bodies with crystal cores and lacy
+rims, spiral arms, synchrony, fusion and division all arise from those rules.
+Every line you see is a bond between two dots. The original Artificial Koi
+forms remain available as the Classic model.
 
 Created by **Lee Daghlar Ostadi**, building on **Artificial Koi** by
 **Studio Coldstream / Mathew Molt** and **GoL Screensaver** by **Harold Martin**.
@@ -24,9 +26,9 @@ Created by **Lee Daghlar Ostadi**, building on **Artificial Koi** by
 The name combines *koi* with *kairos*, the idea of the right or opportune
 moment—a name for forms unfolding in their own time.
 
-<p align="center"><img src="docs/images/koiros-render.jpg" width="280" alt="An actual Koiros simulation frame: luminous forms against a dark background"></p>
+<p align="center"><img src="docs/images/koiros-lattice.jpg" width="280" alt="An actual Koiros 3.0 frame: glowing lattice bodies of bonded dots with spiral arms, spread over a dark screen"></p>
 
-*An offscreen Android render from the release verification, not a photograph of a phone.*
+*An offscreen Android render of the Emergent lattice at full phone resolution, one minute after a random start; not a photograph of a phone.*
 
 ## Install and make it yours
 
@@ -45,6 +47,16 @@ or **4 Hz** for more frequent simulation updates; drawing runs independently.
 The sliders reach **0.02×** for very gradual motion.
 
 ## What evolves
+
+**Emergent lattice** (default):
+
+- **Dots, not drawn shapes:** about 270 dots per lineage, each with a position, rhythm, colour, spin, depth and valence. Bonds form, breathe and snap by the dots' own rules; bodies are just connected groups of bonds. [The equations](docs/DYNAMICS.md).
+- **Bodies that make themselves:** dots that can hold more bonds sort into crystal cores; dots that hold two or three make nets and lacy rims; swirl strongest at the edge winds them into spiral arms.
+- **Fusion and division without a script:** bodies that fall into step attract and knit together, and colour and rhythm average along the new bonds. When their rhythms can no longer stay locked they drift apart again, and quorum sensing loosens any body that grows too large.
+- **The whole screen:** bodies spread over all of it, start in a random arrangement every time, and look three-dimensional: near bodies larger and brighter, tilted like galaxies, with home-page parallax.
+- **Colour that flows:** a gradient across each body that drifts smoothly with the palette, and the hidden water carries colour between bodies.
+
+**Classic forms:**
 
 - **Ten forms:** Koi, Jellyfish, Manta, Coral, Helix, Breathe, Bloom, Trance, Koi II, and Nebula, continuously morphing between one another.
 - **One shared world:** every form lives in the same Conway Life world. Each senses the cells where it swims, seeds new life in its wake, and is carried by currents measured from the whole world's changing frequencies.
@@ -70,7 +82,7 @@ Install the documented JDK and Android SDK, then run:
 python3 tools/verify_reproducible.py
 ```
 
-This runs all ten simulation test suites and makes two clean builds, comparing
+This runs all eleven simulation test suites and makes two clean builds, comparing
 their APK bytes. Unsigned APKs are build artifacts; install the signed release
 above or [sign your own build](docs/BUILDING.md).
 

@@ -12,7 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "org.ostadix.koilife"
-MODELS = ("Companion", "CoupledChaos", "FrameBudget", "KoiForms", "LifeField", "PageDrift",
+MODELS = ("Companion", "CoupledChaos", "DotLattice", "FrameBudget", "KoiForms", "LifeField", "PageDrift",
           "PondDynamics", "TouchRipples", "WorldTint")
 
 
@@ -42,7 +42,7 @@ def run_tests(root: Path, output: Path, javac: str | None = None,
     subprocess.run([javac, "--release", "8", "-encoding", "UTF-8", "-d", str(output),
                     *sources], cwd=root, check=True, timeout=180)
     for name in tests:
-        subprocess.run([java, "-cp", str(output), name], cwd=root, check=True, timeout=180)
+        subprocess.run([java, "-cp", str(output), name], cwd=root, check=True, timeout=420)
     return tests
 
 

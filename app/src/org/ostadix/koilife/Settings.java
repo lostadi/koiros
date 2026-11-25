@@ -32,10 +32,15 @@ final class Settings {
     /** New in 2.0: colours of apps used, read on this phone with usage access. */
     boolean knowMyDay() { return prefs.getBoolean("know_my_day", true); }
     boolean field() { return prefs.getBoolean("field", false); }
+    /** New in 3.0: dots that obey their own equations; "classic" keeps the original forms. */
+    boolean lattice() { return !"classic".equals(prefs.getString("model", "lattice")); }
+    Pond createPond(long seed) { return lattice() ? new LatticeRenderer(seed) : new KoiRenderer(seed); }
+    /** True when the pond's model differs from the saved choice. */
+    boolean modelChanged(Pond pond) { return (pond instanceof LatticeRenderer) != lattice(); }
     boolean touchRipples() { return prefs.getBoolean("touch_ripples", true); }
     boolean autoReseed() { return prefs.getBoolean("auto_reseed", true); }
     void newSeed() { prefs.edit().putLong("seed", new SecureRandom().nextLong()).apply(); }
-    void configure(KoiRenderer renderer) {
+    void configure(Pond renderer) {
         renderer.configure(rate(), strength(), 14000, field(), autoReseed());
         renderer.setAnimationSpeeds(motionSpeed(), formSpeed(), colorSpeed());
         renderer.configurePopulation(count(), varyCount(), collisions(), merging());

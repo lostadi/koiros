@@ -44,7 +44,9 @@ public final class MainActivity extends Activity {
         TextView title = text("Koiros", 27, TEXT);
         title.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         heading.addView(title);
-        heading.addView(text("Slowly evolving shapes, color, and currents", 13, MUTED));
+        heading.addView(text(settings.lattice()
+            ? "Dots that bond, keep rhythm, fuse and divide"
+            : "Slowly evolving shapes, color, and currents", 13, MUTED));
         root.addView(heading);
         preview = new PondPreview();
         preview.setContentDescription("Live preview of Koiros forms in their shared Game of Life world");
@@ -56,6 +58,7 @@ public final class MainActivity extends Activity {
         controls.setOrientation(LinearLayout.VERTICAL);
         controls.setPadding(dp(20), dp(12), dp(20), dp(12));
         controls.setBackgroundColor(PANEL);
+        addModelControl(controls);
         controls.addView(text("ANIMATION SPEED", 11, MUTED));
         addSpeedControl(controls, "Drift", "motion_speed", settings.motionSpeed());
         addSpeedControl(controls, "Shape evolution", "form_speed", settings.formSpeed());
@@ -86,9 +89,11 @@ public final class MainActivity extends Activity {
             public void onStopTrackingTouch(SeekBar view) { }
         });
         controls.addView(gain, new LinearLayout.LayoutParams(-1, dp(36)));
-        Switch field = new Switch(this); field.setText("Show frequency field"); field.setTextColor(TEXT); field.setChecked(settings.field());
-        field.setOnCheckedChangeListener((button, checked) -> settings.prefs.edit().putBoolean("field", checked).apply());
-        controls.addView(field, new LinearLayout.LayoutParams(-1, dp(43)));
+        if (!settings.lattice()) {
+            Switch field = new Switch(this); field.setText("Show frequency field"); field.setTextColor(TEXT); field.setChecked(settings.field());
+            field.setOnCheckedChangeListener((button, checked) -> settings.prefs.edit().putBoolean("field", checked).apply());
+            controls.addView(field, new LinearLayout.LayoutParams(-1, dp(43)));
+        }
         Switch ripples = new Switch(this); ripples.setText("Tap ripples"); ripples.setTextColor(TEXT);
         ripples.setChecked(settings.touchRipples());
         ripples.setOnCheckedChangeListener((button, checked) ->
@@ -151,14 +156,31 @@ public final class MainActivity extends Activity {
     private String speedLabel(String title, int percent) {
         return String.format(java.util.Locale.getDefault(), "%s · %.2f×", title, percent / 100.0);
     }
+    private void addModelControl(LinearLayout controls) {
+        controls.addView(text("MODEL", 11, MUTED));
+        RadioGroup models = new RadioGroup(this);
+        models.setOrientation(RadioGroup.VERTICAL);
+        RadioButton lattice = new RadioButton(this); lattice.setId(201);
+        lattice.setText("Emergent lattice · dots obey their own equations"); lattice.setTextColor(TEXT);
+        RadioButton classic = new RadioButton(this); classic.setId(202);
+        classic.setText("Classic forms · the original point equations"); classic.setTextColor(TEXT);
+        models.addView(lattice, new RadioGroup.LayoutParams(-1, dp(44)));
+        models.addView(classic, new RadioGroup.LayoutParams(-1, dp(44)));
+        models.check(settings.lattice() ? 201 : 202);
+        models.setOnCheckedChangeListener((group, id) -> {
+            settings.prefs.edit().putString("model", id == 201 ? "lattice" : "classic").apply();
+            recreate();
+        });
+        controls.addView(models);
+    }
     private void addPopulationControls(LinearLayout controls) {
-        TextView heading = text("CREATURES", 11, MUTED);
+        TextView heading = text(settings.lattice() ? "LINEAGES" : "CREATURES", 11, MUTED);
         heading.setPadding(0, dp(8), 0, dp(4));
         controls.addView(heading);
         TextView countLabel = text(populationLabel(settings.count(), settings.varyCount()), 14, TEXT);
         controls.addView(countLabel);
         Switch vary = new Switch(this);
-        vary.setText("Vary count automatically");
+        vary.setText(settings.lattice() ? "Let crowding vary" : "Vary count automatically");
         vary.setTextColor(TEXT);
         vary.setChecked(settings.varyCount());
         SeekBar countSlider = new SeekBar(this);
@@ -232,6 +254,7 @@ public final class MainActivity extends Activity {
         catch (android.content.ActivityNotFoundException ignored) { }
     }
     private String populationLabel(int count, boolean varying) {
+        if (settings.lattice()) return "Lineages · " + count + " × " + LatticeRenderer.DOTS_PER_BODY + " dots";
         return (varying ? "Maximum creatures" : "Creatures") + " · " + count;
     }
     private void chooseWallpaper() {
@@ -248,7 +271,8 @@ public final class MainActivity extends Activity {
     }
     private void showAbout() {
         String info = "Koiros — Lee Ostadi’s evolving computational wallpaper.\n\n"
-            + "One to nine luminous forms live in a single shared Game of Life world. Each senses the living cells where it swims, seeds new life in its wake, and paints its colour into the water; Life then carries that colour onward, so forms influence one another even from across the screen. All of them drift in the same currents, measured from the world's changing spatial frequencies and a ring of coupled chaotic systems.\n\n"
+            + "In the Emergent lattice model there are no scripted shapes. Every dot obeys the same few equations: it bonds to nearby dots up to its valence, more readily when they share its rhythm and colour; bonds are springs that breathe with that rhythm and snap when stretched or out of step; rhythm, colour, spin and heading spread along bonds; and each dot gathers toward dots in step with it, circles the density it feels, swims, and drifts in the hidden Game of Life current. Bodies, spiral arms, crystal cores and lacy rims, synchrony, fusion and division all arise from those rules. Every line you see is a bond between two dots.\n\n"
+            + "In the Classic forms model, one to nine luminous forms live in a single shared Game of Life world. Each senses the living cells where it swims, seeds new life in its wake, and paints its colour into the water; Life then carries that colour onward, so forms influence one another even from across the screen. All of them drift in the same currents, measured from the world's changing spatial frequencies and a ring of coupled chaotic systems.\n\n"
             + "Forms that meet can merge. Threads of light reach between them, their rhythm, rotation, depth, colour and shape converge, and they become one larger body. Later the body divides again along a new axis, and each form leaves carrying part of what it shared. Turn off Merging to keep them separate.\n\n"
             + "Koiros also keeps you company. Tap the water and nearby forms come to look, and they grow more eager the more you play. Come back after a while and they gather to meet you. With Know my day, the colours of the apps you spent time in arrive in the water when you return. Everything is read on this phone; Koiros has no internet access.\n\n"
             + "The shapes come from Artificial Koi’s ten original point equations, which every form tours and blends between. Use Drift, Shape evolution, and Color drift for a calmer pace. Nearer forms are larger and shift farther when you swipe between home pages. The pond pauses when hidden and draws at a lower rate when you are not touching it.\n\n"
@@ -278,7 +302,7 @@ public final class MainActivity extends Activity {
 
     private final class PondPreview extends View implements
             SharedPreferences.OnSharedPreferenceChangeListener, android.view.Choreographer.FrameCallback {
-        private final KoiRenderer renderer;
+        private Pond renderer;
         private final FrameBudget budget = new FrameBudget();
         private final android.view.Choreographer choreographer = android.view.Choreographer.getInstance();
         private boolean running, scheduled;
@@ -291,7 +315,7 @@ public final class MainActivity extends Activity {
         private double clickU = .5, clickV = .5;
         private boolean clickFromTouch;
         PondPreview() {
-            super(MainActivity.this); seed = settings.seed(); renderer = new KoiRenderer(seed);
+            super(MainActivity.this); seed = settings.seed(); renderer = settings.createPond(seed);
             settings.configure(renderer); settings.prefs.registerOnSharedPreferenceChangeListener(this);
             touchSlop = ViewConfiguration.get(MainActivity.this).getScaledTouchSlop();
             tapTimeoutMs = Math.min(ViewConfiguration.getLongPressTimeout(),
@@ -323,7 +347,8 @@ public final class MainActivity extends Activity {
             schedule();
         }
         public void onSharedPreferenceChanged(SharedPreferences p, String key) {
-            if (seed != settings.seed()) { seed = settings.seed(); renderer.reseed(seed); lastNanos = 0; }
+            if (settings.modelChanged(renderer)) { seed = settings.seed(); renderer = settings.createPond(seed); lastNanos = 0; }
+            else if (seed != settings.seed()) { seed = settings.seed(); renderer.reseed(seed); lastNanos = 0; }
             settings.configure(renderer);
             tapPointer = -1;
             setClickable(settings.touchRipples());
