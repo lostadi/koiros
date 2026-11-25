@@ -12,8 +12,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "org.ostadix.koilife"
-MODELS = ("CoupledChaos", "FrameBudget", "KoiForms", "LifeField", "PageDrift", "PondDynamics",
-          "TouchRipples")
+MODELS = ("Companion", "CoupledChaos", "FrameBudget", "KoiForms", "LifeField", "PageDrift",
+          "PondDynamics", "TouchRipples", "WorldTint")
 
 
 def java_tool(name: str) -> str:

@@ -46,8 +46,18 @@ public final class KoiForms {
      */
     public static boolean evaluate(int form, int index, int pointCount, int creature,
                                    double time, double sf, double sa, double[] out) {
+        if (creature < 0) throw new IllegalArgumentException("Invalid point or creature index");
+        return evaluate(form, index, pointCount, (double) creature, time, sf, sa, out);
+    }
+
+    /**
+     * As above with a continuous phase group. Integer groups give exactly the
+     * original rotation offsets; bodies that merge rotate smoothly between them.
+     */
+    public static boolean evaluate(int form, int index, int pointCount, double group,
+                                   double time, double sf, double sa, double[] out) {
         checkForm(form);
-        if (pointCount <= 0 || index < 0 || index >= pointCount || creature < 0) {
+        if (pointCount <= 0 || index < 0 || index >= pointCount || !finite(group) || group < 0) {
             throw new IllegalArgumentException("Invalid point or creature index");
         }
         if (out == null || out.length < 2) {
@@ -67,7 +77,7 @@ public final class KoiForms {
                 o = sqrt(k * k + e * e) / 6.2;
                 q = (k * y / 12.4 + 71 + sin(y * 1.1) / k
                         + k * cos(y / 2.1) * 1.9 * sin(o * 3.1 - e / 1.9 - time)) * sa;
-                c = o * e / 18.4 + time / 8 + creature * 8.0;
+                c = o * e / 18.4 + time / 8 + group * 8.0;
                 x = q * cos(c);
                 py = q * sin(c) + 93 * cos(c / 2) + 6 * sin(c * 1.5);
                 break;
@@ -78,7 +88,7 @@ public final class KoiForms {
                 d = (k * k + e * e) / 76.0 + 1;
                 q = (81 - e * sin(k * 1.05) + k / d
                         * (8.5 + 4.2 * sin(sin(d * d * 0.97 + e / 8.5 - time)))) * sa;
-                c = d / 2.1 - cos(d * 2.05) / 4.6 - time / 16 + creature * 3.0;
+                c = d / 2.1 - cos(d * 2.05) / 4.6 - time / 16 + group * 3.0;
                 x = q * sin(c);
                 py = (q + 38) * cos(c) + 6 * sin(c * 2);
                 break;
@@ -89,7 +99,7 @@ public final class KoiForms {
                 d = (k * k + e * e) / 95.0 + 1;
                 q = (77 - e * sin(k * 0.96) + k / d
                         * (8.4 + 5.2 * sin(d * 2.1 + cos(d * 4.8 - time * 2)))) * sa;
-                c = d / 1.55 + e / 64 * sin(time + d * 1.05) - time / 8 + creature * 3.0;
+                c = d / 1.55 + e / 64 * sin(time + d * 1.05) - time / 8 + group * 3.0;
                 x = q * sin(c);
                 py = (q + 42) * cos(c);
                 break;
@@ -99,7 +109,7 @@ public final class KoiForms {
                 e = y / 7.8 - 13.2;
                 o = sqrt(k * k + e * e) / 6.3;
                 q = (k * y / 18 + 61 + k * sin(y) * sin(o * 2.1 - e / 3.2 - time)) * sa;
-                c = o / 3.1 - e / 5.2 - time / 8 + creature * 8.0;
+                c = o / 3.1 - e / 5.2 - time / 8 + group * 8.0;
                 x = q * sin(c) - 84 * cos(c / 3);
                 py = (q + 66) * cos(c) + 4 * sin(c * 2);
                 break;
@@ -111,7 +121,7 @@ public final class KoiForms {
                 o = sqrt(k * k + e * e) / 7.8;
                 q = (k * sin(y / 18 + 1.1) + 71 + k * sin(y * 1.03) + 1 / k
                         + k * (1.9 + sin(e + o * 3.9 - time * 2))) * sa;
-                c = o / 4.1 + e / 5.3 - time / 8 + creature * 3.0;
+                c = o / 4.1 + e / 5.3 - time / 8 + group * 3.0;
                 x = q * 0.72 * cos(c);
                 py = (q + 28) * sin(c) + y * 0.95 * sin(c * 2);
                 break;
@@ -121,7 +131,7 @@ public final class KoiForms {
                 e = y / 8.2 - 12.8;
                 o = sqrt(k * k + e * e);
                 q = (y / 18 * k + 71 + k * cos(y * 0.97) * 1.9 * sin(o * 1.03 - time * 8)) * sa;
-                c = o * e / 92 + time + creature * 9.0;
+                c = o * e / 92 + time + group * 9.0;
                 x = q * sin(c) + 43 * sin(c / 2);
                 py = (q + 67) * cos(c);
                 break;
@@ -131,7 +141,7 @@ public final class KoiForms {
                 e = y / 7.8 - 13.3;
                 o = sqrt(k * k + e * e) / 6.2;
                 q = (k * y / 18 + 51 + k * sin(y) * sin(o * 2.1 - e / 5.3 - time)) * sa;
-                c = o / 3.1 - e / 5.2 - time / 8 + creature * 8.0;
+                c = o / 3.1 - e / 5.2 - time / 8 + group * 8.0;
                 x = q * sin(c) - 75 * cos(c / 3);
                 py = (q + 72) * cos(c);
                 break;
@@ -142,7 +152,7 @@ public final class KoiForms {
                 o = sqrt(k * k + e * e) / 6.1;
                 q = (k * y / 14.5 + 77 + k * sin(y * 1.04)
                         * (1 + sin(o * 3.9 - e * 1.04 - time * 8))) * sa;
-                c = o / 2.05 - e / 4.1 - time + creature * 15.0;
+                c = o / 2.05 - e / 4.1 - time + group * 15.0;
                 x = q * sin(c) + 67 * sin(c / 3);
                 py = q / 0.72 * cos(c);
                 break;
@@ -154,7 +164,7 @@ public final class KoiForms {
                 o = sqrt(k * k + e * e) / 6.1;
                 q = (k * 2.05 + 51 + cos(18 / k) + k * cos(y / 2.06)
                         * (1 + sin(o * 3.9 - e * 2.05 - time))) * sa;
-                c = o / 1.53 - e / 5.1 - time / 8 + creature * 8.0;
+                c = o / 1.53 - e / 5.1 - time / 8 + group * 8.0;
                 x = q * sin(c);
                 py = q * cos(c) - 76 * sin(c / 3);
                 break;
@@ -166,7 +176,7 @@ public final class KoiForms {
                 e = si / 960 - 12.3;
                 d = (k * k + e * e) / 96.0 + 1;
                 q = (k * (4.1 + sin(d * 15.5 - time + k)) - 5.3 * sin(atan2(k, e) * 9)) * sa;
-                c = d * 1.12 - time / 18 + creature * 3.0;
+                c = d * 1.12 - time / 18 + group * 3.0;
                 x = q + 62 * sin(c);
                 py = (q + 41) * sin(c - d) + d * 77 - 200;
                 break;

@@ -25,6 +25,12 @@ final class Settings {
     int count() { return Math.max(1, Math.min(9, prefs.getInt("count", 3))); }
     boolean varyCount() { return prefs.getBoolean("vary_count", true); }
     boolean collisions() { return prefs.getBoolean("collisions", true); }
+    /** New in 2.0, so existing installs receive it on. */
+    boolean merging() { return prefs.getBoolean("merging", true); }
+    /** New in 2.0: forms respond to touch and to their person's return. */
+    boolean companion() { return prefs.getBoolean("companion", true); }
+    /** New in 2.0: colours of apps used, read on this phone with usage access. */
+    boolean knowMyDay() { return prefs.getBoolean("know_my_day", true); }
     boolean field() { return prefs.getBoolean("field", false); }
     boolean touchRipples() { return prefs.getBoolean("touch_ripples", true); }
     boolean autoReseed() { return prefs.getBoolean("auto_reseed", true); }
@@ -32,7 +38,7 @@ final class Settings {
     void configure(KoiRenderer renderer) {
         renderer.configure(rate(), strength(), 14000, field(), autoReseed());
         renderer.setAnimationSpeeds(motionSpeed(), formSpeed(), colorSpeed());
-        renderer.configurePopulation(count(), varyCount(), collisions());
+        renderer.configurePopulation(count(), varyCount(), collisions(), merging());
         renderer.setTouchRipplesEnabled(touchRipples());
     }
 }

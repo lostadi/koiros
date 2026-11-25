@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.ostadix.koilife" android:versionCode="9" android:versionName="1.8">
+    package="org.ostadix.koilife" android:versionCode="10" android:versionName="2.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Know my day: which apps were used, read on the phone only. Koiros has no
+         internet permission, so this information cannot leave the device. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-feature android:name="android.software.live_wallpaper" android:required="true" />
     <application android:label="Koiros" android:icon="@drawable/pond_icon"
         android:theme="@style/AppTheme" android:allowBackup="true"

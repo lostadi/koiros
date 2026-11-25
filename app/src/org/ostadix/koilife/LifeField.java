@@ -261,6 +261,72 @@ public final class LifeField {
         sampleBoundsDirty = false;
     }
 
+    /**
+     * Brings dead cells to life inside a wrapped disc around (u, v), each with
+     * the given probability, using this field's own seeded generator. Living
+     * cells stay alive. Returns the number born. The spectrum follows at the
+     * next generation, exactly as for cells born by the Life rule.
+     */
+    public int seedDisc(double u, double v, double radiusCells, double probability) {
+        if (!(radiusCells > 0.0) || Double.isInfinite(radiusCells) || !(probability > 0.0)) {
+            return 0;
+        }
+        double chance = Math.min(1.0, probability);
+        double limit = Math.min(radiusCells, Math.max(columns, rows));
+        int reach = (int) Math.ceil(limit);
+        int centerX = (int) Math.floor(wrap(u) * columns) % columns;
+        int centerY = (int) Math.floor(wrap(v) * rows) % rows;
+        double square = limit * limit;
+        int born = 0;
+        for (int dy = -reach; dy <= reach; dy++) {
+            for (int dx = -reach; dx <= reach; dx++) {
+                if (dx * dx + dy * dy > square) continue;
+                int index = Math.floorMod(centerY + dy, rows) * columns + Math.floorMod(centerX + dx, columns);
+                if (cells[index]) continue;
+                if (random.nextDouble() < chance) {
+                    cells[index] = true;
+                    population++;
+                    born++;
+                }
+            }
+        }
+        return born;
+    }
+
+    /**
+     * Statistics of a wrapped disc around (u, v): out[0] is its live fraction
+     * and out[1] the fraction of its cells that differ from the previous
+     * generation (zero before the first). Allocation-free.
+     */
+    public void sampleLocal(double u, double v, int radiusCells, double[] out) {
+        if (out == null || out.length < 2) {
+            throw new IllegalArgumentException("Local sample needs two elements");
+        }
+        int reach = Math.max(0, Math.min(radiusCells, Math.max(columns, rows)));
+        int centerX = (int) Math.floor(wrap(u) * columns) % columns;
+        int centerY = (int) Math.floor(wrap(v) * rows) % rows;
+        int square = reach * reach, total = 0, alive = 0, changed = 0;
+        for (int dy = -reach; dy <= reach; dy++) {
+            for (int dx = -reach; dx <= reach; dx++) {
+                if (dx * dx + dy * dy > square) continue;
+                int index = Math.floorMod(centerY + dy, rows) * columns + Math.floorMod(centerX + dx, columns);
+                total++;
+                if (cells[index]) alive++;
+                if (hasPrevious && cells[index] != previous[index]) changed++;
+            }
+        }
+        out[0] = alive / (double) total;
+        out[1] = changed / (double) total;
+    }
+
+    /** Copies the alive flags, row-major, into out (at least columns*rows long). */
+    public void copyCells(boolean[] out) {
+        if (out == null || out.length < cellCount) {
+            throw new IllegalArgumentException("Cell copy needs room for every cell");
+        }
+        System.arraycopy(cells, 0, out, 0, cellCount);
+    }
+
     /** Fraction of cells that changed in the latest generation. */
     public double getActivity() {
         return activity;

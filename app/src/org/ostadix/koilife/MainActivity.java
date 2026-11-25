@@ -47,7 +47,7 @@ public final class MainActivity extends Activity {
         heading.addView(text("Slowly evolving shapes, color, and currents", 13, MUTED));
         root.addView(heading);
         preview = new PondPreview();
-        preview.setContentDescription("Live preview of Koi and Game of Life frequency projections");
+        preview.setContentDescription("Live preview of Koiros forms in their shared Game of Life world");
         root.addView(preview, new LinearLayout.LayoutParams(-1, 0, 1));
 
         ScrollView scroll = new ScrollView(this);
@@ -61,6 +61,7 @@ public final class MainActivity extends Activity {
         addSpeedControl(controls, "Shape evolution", "form_speed", settings.formSpeed());
         addSpeedControl(controls, "Color drift", "color_speed", settings.colorSpeed());
         addPopulationControls(controls);
+        addCompanionControls(controls);
         controls.addView(text("LIFE EVOLUTION SPEED", 11, MUTED));
         RadioGroup rates = new RadioGroup(this);
         rates.setOrientation(RadioGroup.HORIZONTAL);
@@ -190,6 +191,45 @@ public final class MainActivity extends Activity {
         collisions.setOnCheckedChangeListener((button, checked) ->
             settings.prefs.edit().putBoolean("collisions", checked).apply());
         controls.addView(collisions, new LinearLayout.LayoutParams(-1, dp(48)));
+        Switch merging = new Switch(this);
+        merging.setText("Merging · fuse and divide");
+        merging.setTextColor(TEXT);
+        merging.setChecked(settings.merging());
+        merging.setOnCheckedChangeListener((button, checked) ->
+            settings.prefs.edit().putBoolean("merging", checked).apply());
+        controls.addView(merging, new LinearLayout.LayoutParams(-1, dp(48)));
+    }
+    private void addCompanionControls(LinearLayout controls) {
+        TextView heading = text("COMPANION", 11, MUTED);
+        heading.setPadding(0, dp(8), 0, dp(4));
+        controls.addView(heading);
+        Switch respond = new Switch(this);
+        respond.setText("Respond to me");
+        respond.setTextColor(TEXT);
+        respond.setChecked(settings.companion());
+        respond.setOnCheckedChangeListener((button, checked) ->
+            settings.prefs.edit().putBoolean("companion", checked).apply());
+        controls.addView(respond, new LinearLayout.LayoutParams(-1, dp(48)));
+        controls.addView(text("Tap the water and nearby forms come to look; the more you play, the more eagerly they come. "
+            + "Come back after a while and they gather to meet you. Calmer at night, sleepy on a low battery.", 12, MUTED));
+        Switch day = new Switch(this);
+        day.setText("Know my day");
+        day.setTextColor(TEXT);
+        day.setChecked(settings.knowMyDay());
+        day.setOnCheckedChangeListener((button, checked) -> {
+            settings.prefs.edit().putBoolean("know_my_day", checked).apply();
+            if (checked && !DayReader.hasAccess(this)) openUsageAccess();
+        });
+        controls.addView(day, new LinearLayout.LayoutParams(-1, dp(48)));
+        TextView dayNote = text(DayReader.hasAccess(this)
+            ? "When you come home, the colours of the apps you spent time in arrive in the water. Read on this phone only; Koiros has no internet access."
+            : "Needs Android usage access to see which apps you used. Tap to allow. Read on this phone only; Koiros has no internet access.", 12, MUTED);
+        dayNote.setOnClickListener(v -> openUsageAccess());
+        controls.addView(dayNote);
+    }
+    private void openUsageAccess() {
+        try { startActivity(new Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)); }
+        catch (android.content.ActivityNotFoundException ignored) { }
     }
     private String populationLabel(int count, boolean varying) {
         return (varying ? "Maximum creatures" : "Creatures") + " · " + count;
@@ -208,10 +248,10 @@ public final class MainActivity extends Activity {
     }
     private void showAbout() {
         String info = "Koiros — Lee Ostadi’s evolving computational wallpaper.\n\n"
-            + "Koiros combines Artificial Koi’s original point equations with Conway’s Game of Life. "
-            + "One to nine creatures morph through ten original Artificial Koi forms, with 48 neon hues forming cohesive spatial gradients that shift gradually across each body. Nine independently seeded Life runs, their measured frequencies, and coupled chaotic systems drive the pond. "
-            + "Use Drift, Shape evolution, and Color drift to give the pond a slower, calmer pace. The pond pauses when the wallpaper is hidden.\n\n"
-            + "Each creature has a fixed depth: nearer ones are larger, and they shift a little farther when you swipe between home pages. Two soft pools of light move slowly in the water behind them.\n\n"
+            + "One to nine luminous forms live in a single shared Game of Life world. Each senses the living cells where it swims, seeds new life in its wake, and paints its colour into the water; Life then carries that colour onward, so forms influence one another even from across the screen. All of them drift in the same currents, measured from the world's changing spatial frequencies and a ring of coupled chaotic systems.\n\n"
+            + "Forms that meet can merge. Threads of light reach between them, their rhythm, rotation, depth, colour and shape converge, and they become one larger body. Later the body divides again along a new axis, and each form leaves carrying part of what it shared. Turn off Merging to keep them separate.\n\n"
+            + "Koiros also keeps you company. Tap the water and nearby forms come to look, and they grow more eager the more you play. Come back after a while and they gather to meet you. With Know my day, the colours of the apps you spent time in arrive in the water when you return. Everything is read on this phone; Koiros has no internet access.\n\n"
+            + "The shapes come from Artificial Koi’s ten original point equations, which every form tours and blends between. Use Drift, Shape evolution, and Color drift for a calmer pace. Nearer forms are larger and shift farther when you swipe between home pages. The pond pauses when hidden and draws at a lower rate when you are not touching it.\n\n"
             + "Artificial Koi — Mathew Molt and credited contributors, GPL-3.0-or-later.\n"
             + "GoL Screensaver — Harold Martin, MIT.\n"
             + "Created by Lee Daghlar Ostadi. Simulation integration built and checked using Ostadix MCP.\n\n"

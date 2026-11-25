@@ -11,9 +11,11 @@ Living mathematics. Slow currents. Color that unfolds.
 </div>
 
 Koiros turns an Android background into a small, continuously evolving world.
-Koi-like creatures drift, gather, separate, and change form. Neon gradients
-travel gently across their bodies. Each scene grows from interacting Game of
-Life fields, frequency projections, and coupled chaotic dynamics.
+Luminous forms share one living Game of Life world: they drift in the same
+currents, fuse into a single body, divide again, and leave their colour in the
+water for others to find. Neon gradients travel gently across their bodies.
+Each scene grows from that shared world, its frequency projections, and coupled
+chaotic dynamics.
 
 Created by **Lee Daghlar Ostadi**, building on **Artificial Koi** by
 **Studio Coldstream / Mathew Molt** and **GoL Screensaver** by **Harold Martin**.
@@ -45,11 +47,14 @@ The sliders reach **0.02×** for very gradual motion.
 ## What evolves
 
 - **Ten forms:** Koi, Jellyfish, Manta, Coral, Helix, Breathe, Bloom, Trance, Koi II, and Nebula, continuously morphing between one another.
-- **One to nine creatures:** keep a fixed count or let the population change gradually up to your chosen maximum.
-- **Living color:** 48-hue spatial gradients, slow palette drift, and gentle color exchange between nearby forms.
-- **Shared motion:** curved currents, soft collisions, and optional fading tap ripples.
-- **Ongoing dynamics:** nine independent Conway Life boards feed measured frequency projections; coupled Lorenz systems keep driving visual evolution when boards settle.
-- **A quiet background:** independent speed controls, adaptive point density, and pause while hidden.
+- **One shared world:** every form lives in the same Conway Life world. Each senses the cells where it swims, seeds new life in its wake, and is carried by currents measured from the whole world's changing frequencies.
+- **Merging and dividing:** forms that meet can fuse. Threads of light reach between them; rhythm, rotation, depth, colour and shape converge until they are one larger body. Later the body divides along a new axis and each form leaves with part of what it shared.
+- **Colour in the water:** forms paint their hue into the unseen world and Life carries it onward, so colour travels between forms even when they never touch.
+- **A companion:** tap the water and nearby forms drift over to look, more eagerly the more you play. Return after a while and they gather toward your thumb. Calmer at night, sleepy on a low battery, brighter while charging. With *Know my day*, the colours of the apps you spent time in arrive in the water when you come home — read on the phone only; Koiros has no internet permission.
+- **One to nine forms:** keep a fixed count or let the population change gradually up to your chosen maximum.
+- **Light that adds up:** additive neon blending, soft glow, hue-true auras, and a flash when bodies fuse or divide.
+- **Ongoing dynamics:** coupled Lorenz systems keep driving visual evolution when the world settles; merged members share one chaotic rhythm.
+- **A quiet background:** calm by default, independent speed controls, adaptive point density, pause while hidden, and 24 fps (20 in Battery Saver or on a low battery) once you stop touching the screen.
 
 This is a simulation rendered on your device, rather than a prerecorded video.
 Its chaotic driver and pattern renewal encourage continued variation; it does
@@ -65,7 +70,7 @@ Install the documented JDK and Android SDK, then run:
 python3 tools/verify_reproducible.py
 ```
 
-This runs all six simulation test suites and makes two clean builds, comparing
+This runs all ten simulation test suites and makes two clean builds, comparing
 their APK bytes. Unsigned APKs are build artifacts; install the signed release
 above or [sign your own build](docs/BUILDING.md).
 
