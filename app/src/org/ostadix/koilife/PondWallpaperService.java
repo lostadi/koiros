@@ -3,7 +3,9 @@ package org.ostadix.koilife;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.app.WallpaperManager;
 import android.content.SharedPreferences;
+import android.os.Bundle;
 import android.graphics.Canvas;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -78,6 +80,10 @@ public final class PondWallpaperService extends WallpaperService {
             // Companion memory lives apart from the settings, so remembering
             // never triggers a reconfiguration.
             memory = getSharedPreferences("companion", Context.MODE_PRIVATE);
+            // Early builds counted every launcher tap as play; start honestly.
+            if (!memory.getBoolean("taps_v2", false)) {
+                memory.edit().putFloat("affection", 0f).putBoolean("taps_v2", true).apply();
+            }
             long now = System.currentTimeMillis();
             renderer.setAffection(Companion.fade(memory.getFloat("affection", 0f),
                 now - memory.getLong("seen", now)));
@@ -271,9 +277,23 @@ public final class PondWallpaperService extends WallpaperService {
                 schedule();
             }
         }
+        /** The launcher reports a tap on empty wallpaper: the forms come to look. */
+        @Override public Bundle onCommand(String action, int x, int y, int z, Bundle extras, boolean resultRequested) {
+            if (WallpaperManager.COMMAND_TAP.equals(action) && visible && !destroyed && renderer != null
+                    && settings.companion()) {
+                SurfaceHolder holder = getSurfaceHolder();
+                int width = holder.getSurfaceFrame().width(), height = holder.getSurfaceFrame().height();
+                if (width > 0 && height > 0) {
+                    markInteraction();
+                    renderer.companionTouch(x / (double) width, y / (double) height, KoiRenderer.TOUCH_TAP);
+                    schedule();
+                }
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested);
+        }
         /**
-         * Holding still draws nearby forms to the finger; a tap brings them to
-         * look. Fast drags, such as swiping between home pages, are ignored.
+         * Holding still draws nearby forms to the finger; any touch earns a
+         * glance. Fast drags, such as swiping between home pages, are ignored.
          */
         private void companionTouch(MotionEvent event, int width, int height) {
             int action = event.getActionMasked();
@@ -295,9 +315,9 @@ public final class PondWallpaperService extends WallpaperService {
                 }
             } else if (action == MotionEvent.ACTION_UP) {
                 petTracking = false;
-                boolean tap = event.getEventTime() - petDownTime <= tapTimeoutMs
-                    && Math.hypot(event.getX() - petDownX, event.getY() - petDownY) <= touchSlop;
-                renderer.companionTouch(u, v, tap ? KoiRenderer.TOUCH_TAP : KoiRenderer.TOUCH_UP);
+                // A raw touch only draws a glance; affection comes from taps on
+                // empty wallpaper, which the launcher reports via onCommand.
+                renderer.companionTouch(u, v, KoiRenderer.TOUCH_UP);
                 schedule();
             } else if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_POINTER_DOWN) {
                 petTracking = false;

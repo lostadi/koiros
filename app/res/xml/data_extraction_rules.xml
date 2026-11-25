@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer: the companion's memory stays on this phone, in both
+     cloud backup and device-to-device transfer. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="companion.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="companion.xml" />
+    </device-transfer>
+</data-extraction-rules>

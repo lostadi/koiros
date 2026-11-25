@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older: back up settings, never the companion's memory,
+     which records icon colours keyed by the apps a person used. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="companion.xml" />
+</full-backup-content>

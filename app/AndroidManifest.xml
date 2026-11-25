@@ -10,6 +10,8 @@
     <uses-feature android:name="android.software.live_wallpaper" android:required="true" />
     <application android:label="Koiros" android:icon="@drawable/pond_icon"
         android:theme="@style/AppTheme" android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

@@ -30,6 +30,7 @@ final class DayReader {
     static final int MAX_APPS = 4;
     private static final long MIN_FOREGROUND_MS = 15_000L;
     private static final long LONGEST_WINDOW_MS = 12L * 3600 * 1000;
+    private static final long LEAD_MS = 5_000L;
 
     private DayReader() { }
 
@@ -56,7 +57,9 @@ final class DayReader {
         if (!hasAccess(context) || to <= from) return 0;
         UsageStatsManager usage = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);
         if (usage == null) return 0;
-        long start = Math.max(from, to - LONGEST_WINDOW_MS);
+        // An app resumes a fraction of a second before the wallpaper learns it
+        // is hidden, so look a little earlier than the hide time.
+        long start = Math.max(from - LEAD_MS, to - LONGEST_WINDOW_MS);
         Map<String, Long> resumed = new HashMap<>(), total = new HashMap<>();
         UsageEvents events = usage.queryEvents(start, to);
         UsageEvents.Event event = new UsageEvents.Event();
@@ -68,9 +71,12 @@ final class DayReader {
                 resumed.put(name, event.getTimeStamp());
             } else if (type == 2 || type == 23) {  // ACTIVITY_PAUSED / ACTIVITY_STOPPED
                 Long began = resumed.remove(name);
-                if (began != null) {
+                // A pause with no recorded start began before the window:
+                // count it from when the pond was hidden.
+                long since = began != null ? began : from;
+                if (event.getTimeStamp() > since) {
                     Long sum = total.get(name);
-                    total.put(name, (sum == null ? 0L : sum) + Math.max(0L, event.getTimeStamp() - began));
+                    total.put(name, (sum == null ? 0L : sum) + (event.getTimeStamp() - since));
                 }
             }
         }
