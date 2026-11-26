@@ -4,6 +4,8 @@
  */
 package org.ostadix.koilife;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -16,11 +18,13 @@ import java.util.Arrays;
 /**
  * Draws {@link DotLattice}: every dot and every bond between two dots, and
  * nothing else that is not attached to them. A bond is drawn as a thin line
- * and always ends at two drawn dots. Dots in the bright half of their rhythm
- * carry a faint glow, so groups that keep the same rhythm visibly pulse
- * together. The Life world is never drawn; it supplies the current the dots
- * swim in, the restlessness that frays bonds, and carries colour between
- * bodies. No allocations occur per frame.
+ * and always ends at two drawn dots. Each dot is drawn in its own exact
+ * colour, with heat mixed in as red, and each bond is a gradient between its
+ * dots. Size, brightness and glow follow each dot's rhythm smoothly, so groups
+ * that keep the same rhythm visibly pulse together. Only the frame is drawn;
+ * the pond goes on beyond it. The Life world is never drawn; it supplies the
+ * current the dots swim in, the restlessness that frays bonds, and carries
+ * colour between bodies. No allocations occur per frame.
  */
 public final class LatticeRenderer implements Pond {
     /** Dots in each lineage's group when it first appears. */
@@ -43,16 +47,18 @@ public final class LatticeRenderer implements Pond {
     /** Below this point budget the glows are skipped; below the next, the body auras too. */
     private static final int GLOW_BUDGET = 6000, AURA_BUDGET = 4000;
     /**
-     * Dots are drawn in four classes, far to near; the bright half of a dot's
-     * rhythm lifts it one class. Width and opacity per class.
+     * Dots, their glows and their bonds are drawn as textured quads, every
+     * vertex in its dot's exact colour: one draw call each, with no palette
+     * steps. Dots are sorted into depth layers so nearer ones sit on top.
      */
-    private static final int TIERS = 4;
-    private static final float[] TIER_WIDTH = {.72f, .95f, 1.2f, 1.5f};
-    private static final int[] TIER_ALPHA = {150, 195, 235, 255};
+    private static final int LAYERS = 8, KIND_STEPS = 1440, DISC = 16, HALO = 32, LINE = 4;
+    /** The disc's radius as a fraction of its quad's half-width. */
+    private static final float DISC_FILL = .9f;
+    /** Heat is drawn as this red, mixed in as strongly as a vertex is hot; the kinds' own reds are softer. */
+    private static final int HEAT_COLOR = Color.rgb(255, 38, 22);
+    private static final short[] QUAD_INDICES = quadIndices(DotLattice.MAX_EDGES);
     /** Each body is drawn as a domed disc tilted in 3D: dome height and largest tilt, in radians. */
     private static final double DOME = .55, TILT = .62;
-    /** Hue spread across a body, diagonally and from core to rim, in degrees. */
-    private static final double GRADIENT_ARC = 100, RADIAL_ARC = 34;
 
     private final LifeField world;
     private final WorldTint tint = new WorldTint(WORLD_COLUMNS, WORLD_ROWS);
@@ -71,8 +77,6 @@ public final class LatticeRenderer implements Pond {
     private final double[] tintSample = new double[2], chaosSample = new double[4], eventOut = new double[3];
     private boolean waterReady;
 
-    private final float[] points = new float[DotLattice.MAX_DOTS * 2], glows = new float[DotLattice.MAX_DOTS * 2];
-    private final float[] lines = new float[DotLattice.MAX_EDGES * 4], faintLines = new float[DotLattice.MAX_EDGES * 4];
     private final float[] screenX = new float[DotLattice.MAX_DOTS], screenY = new float[DotLattice.MAX_DOTS];
     private final double[] previousX = new double[DotLattice.MAX_DOTS], previousY = new double[DotLattice.MAX_DOTS];
     private final double[] previousPhase = new double[DotLattice.MAX_DOTS];
@@ -81,6 +85,9 @@ public final class LatticeRenderer implements Pond {
     private final double[] auraX = new double[DotLattice.MAX_BODIES], auraY = new double[DotLattice.MAX_BODIES];
     private final int[] auraCount = new int[DotLattice.MAX_BODIES], slotOfId = new int[256];
     private double pondAccumulator;
+    private double stirU, stirV, stirVelocityU, stirVelocityV, stirFade, stirAt;
+    private double pendingPulseU, pendingPulseV;
+    private boolean pulsePending;
     // Depth: each dot is drawn about a smoothed centre of its body, so fusing
     // bodies glide into one projection instead of jumping.
     private final double[] anchorX = new double[DotLattice.MAX_DOTS], anchorY = new double[DotLattice.MAX_DOTS];
@@ -92,22 +99,24 @@ public final class LatticeRenderer implements Pond {
     private final double[][] field = new double[6][FIELD_COLUMNS * FIELD_ROWS];
     private final double[] projected = new double[6];
     private boolean fieldReady;
-    private final int[] dotTier = new int[DotLattice.MAX_DOTS];
-    private final int[][] tierCounts = new int[TIERS][COLOR_BUCKETS], tierOffsets = new int[TIERS][COLOR_BUCKETS];
-    private final int[][] tierCursor = new int[TIERS][COLOR_BUCKETS];
-    private int anchorVersion = -1, anchorCount = -1;
+    private int anchorVersion = -1;
     private double tiltClock, axisClock;
-    private int savedVersion = -1, savedCount = -1;
+    private int savedVersion = -1;
     private int stepsThisFrame;
-    private final int[] dotBucket = new int[DotLattice.MAX_DOTS];
-    private final boolean[] drawBond = new boolean[DotLattice.MAX_EDGES];
-    private final boolean[] visibleDot = new boolean[DotLattice.MAX_DOTS], glowing = new boolean[DotLattice.MAX_DOTS];
-    private final boolean[] bright = new boolean[DotLattice.MAX_DOTS];
-    private final int[] glowCounts = new int[COLOR_BUCKETS], glowOffsets = new int[COLOR_BUCKETS];
-    private final int[] lineCounts = new int[COLOR_BUCKETS], lineOffsets = new int[COLOR_BUCKETS];
-    private final int[] faintCounts = new int[COLOR_BUCKETS], faintOffsets = new int[COLOR_BUCKETS];
-    private final int[] cursorA = new int[COLOR_BUCKETS], cursorB = new int[COLOR_BUCKETS];
+    private final boolean[] visibleDot = new boolean[DotLattice.MAX_DOTS], anchorFresh = new boolean[DotLattice.MAX_DOTS];
+    private final float[] dotVerts = new float[DotLattice.MAX_DOTS * 8], glowVerts = new float[DotLattice.MAX_DOTS * 8];
+    private final float[] lineVerts = new float[DotLattice.MAX_EDGES * 8];
+    private final float[] dotTexs = quadTexs(DotLattice.MAX_DOTS, DISC), glowTexs = quadTexs(DotLattice.MAX_DOTS, HALO);
+    private final float[] lineTexs = lineTexs(DotLattice.MAX_EDGES);
+    private final int[] dotColors = new int[DotLattice.MAX_DOTS * 4], glowColors = new int[DotLattice.MAX_DOTS * 4];
+    private final int[] lineColors = new int[DotLattice.MAX_EDGES * 4];
+    private final int[] dotColor = new int[DotLattice.MAX_DOTS], dotLayer = new int[DotLattice.MAX_DOTS];
+    private final int[] order = new int[DotLattice.MAX_DOTS], layerCounts = new int[LAYERS], layerStart = new int[LAYERS];
+    private final float[] dotSize = new float[DotLattice.MAX_DOTS], dotLight = new float[DotLattice.MAX_DOTS];
+    private final float[] dotGlow = new float[DotLattice.MAX_DOTS];
+    private final int[] kindPalette = new int[KIND_STEPS];
     private final int[] colors = new int[COLOR_BUCKETS];
+    private boolean paletteReady;
     private final Shader[] auraShaders = new Shader[COLOR_BUCKETS];
     private final float[] hsv = new float[3];
     private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG), glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -130,7 +139,8 @@ public final class LatticeRenderer implements Pond {
     private long seed;
     private boolean seeded, varying = true;
     private double waterStrength = .85, motionSpeed = 1, formSpeed = 1, colorSpeed = 1;
-    private double elapsedTime, colorPhase, climate = 1, unitsW = 1, unitsH = 2;
+    private double elapsedTime, climate = 1, unitsW = 1, unitsH = 2;
+    private double hueDriftTarget, hueDriftNow;
     private double simulationCostMs, geometryCostMs, canvasCostMs;
     private int lastLinkCount, lastPointCount;
     private volatile double pageCentered;
@@ -143,16 +153,26 @@ public final class LatticeRenderer implements Pond {
         dots = new DotLattice(seed ^ System.nanoTime());
         this.seed = seed;
         PorterDuffXfermode light = new PorterDuffXfermode(PorterDuff.Mode.ADD);
-        dotPaint.setStyle(Paint.Style.STROKE); dotPaint.setStrokeCap(Paint.Cap.ROUND); dotPaint.setXfermode(light);
-        glowPaint.setStyle(Paint.Style.STROKE); glowPaint.setStrokeCap(Paint.Cap.ROUND); glowPaint.setXfermode(light);
-        linePaint.setStyle(Paint.Style.STROKE); linePaint.setStrokeCap(Paint.Cap.BUTT); linePaint.setXfermode(light);
+        // Quads textured with a white disc, a soft halo, or a line's cross-section;
+        // the vertex colours tint them.
+        dotPaint.setShader(new BitmapShader(sprite(DISC, false), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        glowPaint.setShader(new BitmapShader(sprite(HALO, true), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        linePaint.setShader(new BitmapShader(lineProfile(), Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        for (Paint paint : new Paint[] {dotPaint, glowPaint, linePaint}) {
+            paint.setStyle(Paint.Style.FILL); paint.setFilterBitmap(true); paint.setXfermode(light);
+        }
+        for (int k = 0; k < KIND_STEPS; k++) {
+            double hue = k * 360.0 / KIND_STEPS;
+            hsv[0] = (float) hue; hsv[1] = (float) kindSaturation(hue); hsv[2] = 1;
+            kindPalette[k] = Color.HSVToColor(hsv);
+        }
         auraPaint.setXfermode(light);
         for (int b = 0; b < COLOR_BUCKETS; b++) {
             hsv[0] = b * (360f / COLOR_BUCKETS); hsv[1] = .88f; hsv[2] = 1;
             int rgb = Color.HSVToColor(hsv);
             int r = Color.red(rgb), g = Color.green(rgb), bl = Color.blue(rgb);
             auraShaders[b] = new RadialGradient(0, 0, 1,
-                new int[] {Color.argb(34, r, g, bl), Color.argb(10, r, g, bl), Color.argb(0, r, g, bl)},
+                new int[] {Color.argb(46, r, g, bl), Color.argb(14, r, g, bl), Color.argb(0, r, g, bl)},
                 new float[] {0, .42f, 1}, Shader.TileMode.CLAMP);
         }
         updatePalette();
@@ -204,8 +224,62 @@ public final class LatticeRenderer implements Pond {
         attentionU = bounded(u, 0, 1); attentionV = bounded(v, 0, 1);
         if (kind == TOUCH_DOWN) { touching = true; attention = Math.max(attention, .45); engagement = 1; }
         else if (kind == TOUCH_MOVE) { if (touching) attention = Math.max(attention, .45); }
-        else if (kind == TOUCH_TAP) { touching = false; affection = Companion.pet(affection); attention = 1; engagement = 1; }
+        else if (kind == TOUCH_TAP) {
+            touching = false; affection = Companion.pet(affection); attention = 1; engagement = 1;
+            pendingPulseU = attentionU; pendingPulseV = attentionV; pulsePending = true;
+        }
         else touching = false;
+    }
+
+    /**
+     * A finger moving over the wallpaper, in screen fractions and screen
+     * fractions per second. Nearby dots move with it at once and keep some of
+     * its velocity, so they can be pushed, pulled apart, gathered or flung.
+     */
+    @Override public void stir(double u, double v, double velocityU, double velocityV) {
+        if (!finite(u) || !finite(v)) return;
+        stirU = bounded(u, 0, 1); stirV = bounded(v, 0, 1);
+        stirVelocityU = finite(velocityU) ? bounded(velocityU, -6, 6) : 0;
+        stirVelocityV = finite(velocityV) ? bounded(velocityV, -6, 6) : 0;
+        stirFade = 1; stirAt = elapsedTime;
+        engagement = Math.max(engagement, .6);
+    }
+
+    private void applyTouch(double elapsed) {
+        int n = dots.getCount();
+        double pondPerReal = Math.max(1e-6, motionSpeed * PACE * (1 + .8 * engagement));
+        if (stirFade > 0 && elapsed > 0) {
+            if (elapsedTime - stirAt > .06) {
+                // The finger has stopped or lifted: its pull fades over a fraction of a second.
+                stirVelocityU *= Math.exp(-elapsed / .1); stirVelocityV *= Math.exp(-elapsed / .1);
+                stirFade = Math.max(0, stirFade - elapsed / .3);
+            }
+            double fx = (stirU - .5) * unitsW, fy = (stirV - .5) * unitsH, radius = .17;
+            double vx = stirVelocityU * unitsW, vy = stirVelocityV * unitsH;
+            for (int i = 0; i < n; i++) {
+                double dx = dots.px[i] - fx, dy = dots.py[i] - fy, d2 = dx * dx + dy * dy;
+                if (d2 > 6.25 * radius * radius) continue;
+                double fall = Math.exp(-d2 / (radius * radius)) * stirFade;
+                double mx = vx * elapsed * fall * .85, my = vy * elapsed * fall * .85;
+                dots.nudge(i, mx, my);
+                previousX[i] += mx; previousY[i] += my;
+                dots.steer(i, vx / pondPerReal, vy / pondPerReal, .6 * fall);
+            }
+        }
+        if (pulsePending) {
+            pulsePending = false;
+            // A tap startles nearby dots outward and pulls their rhythms into one
+            // bright beat, so they flash together; then curiosity brings them back.
+            double fx = (pendingPulseU - .5) * unitsW, fy = (pendingPulseV - .5) * unitsH, radius = .22;
+            for (int i = 0; i < n; i++) {
+                double dx = dots.px[i] - fx, dy = dots.py[i] - fy, d2 = dx * dx + dy * dy;
+                if (d2 > 6.25 * radius * radius) continue;
+                double d = Math.sqrt(d2) + 1e-6, fall = Math.exp(-d2 / (radius * radius));
+                dots.steer(i, .16 * dx / d, .16 * dy / d, .8 * fall);
+                double toBright = -Math.atan2(Math.sin(dots.phase[i]), Math.cos(dots.phase[i]));
+                dots.phase[i] += toBright * .75 * fall;
+            }
+        }
     }
     @Override public void greet(double strength) {
         double s = bounded(strength, 0, 1);
@@ -233,14 +307,14 @@ public final class LatticeRenderer implements Pond {
             double u = (k & 1) == 0 ? .05 : .95;
             double v = .16 + .66 * (wrapDegrees(hues[k] * 2.3 + k * 97) / 360);
             world.seedDisc(u, v, 3.5 + 3 * weight, .55);
-            tint.paint(u, v, 7 + 6 * weight, wrapDegrees(hues[k] - 214 - colorPhase), .95 * weight);
+            tint.paint(u, v, 7 + 6 * weight, wrapDegrees(hues[k] - 214), .95 * weight);
             queueFlash(u, v, hues[k], .5 + .5 * weight);
         }
         if (n == 0) return;
         for (int slot = 0; slot < dots.bodyCount; slot++) {
             int k = slot % n;
             if (!finite(hues[k])) continue;
-            double target = wrapDegrees(hues[k] - 214 - colorPhase), lean = .55 * bounded(weights[k], .3, 1);
+            double target = wrapDegrees(hues[k] - 214), lean = .55 * bounded(weights[k], .3, 1);
             int id = dots.bodyId[slot];
             for (int i = 0; i < dots.count; i++) {
                 if (dots.bodyOf[i] != id) continue;
@@ -275,6 +349,7 @@ public final class LatticeRenderer implements Pond {
             dots.resize(unitsW, unitsH);
         }
         reconcilePopulation();
+        followSlots();
         advanceWorld(elapsed);
         // The companion: attention follows a touch, a welcome gathers dots
         // toward the thumb, and engagement briefly quickens a slow pond.
@@ -300,14 +375,16 @@ public final class LatticeRenderer implements Pond {
             saveState();
             updateWater(step / Math.max(1e-6, motionSpeed * PACE));
             dots.step(step);
+            followSlots();
             pondAccumulator -= step;
             stepsThisFrame++;
         }
-        if (dots.structureVersion != savedVersion || dots.getCount() != savedCount) saveState();
+        if (dots.structureVersion != savedVersion) saveState();
+        applyTouch(elapsed);
         double blend = pondAccumulator / STEP;
         for (int i = 0, n = dots.getCount(); i < n; i++) {
-            drawX[i] = previousX[i] + (dots.x[i] - previousX[i]) * blend;
-            drawY[i] = previousY[i] + (dots.y[i] - previousY[i]) * blend;
+            drawX[i] = previousX[i] + (dots.px[i] - previousX[i]) * blend;
+            drawY[i] = previousY[i] + (dots.py[i] - previousY[i]) * blend;
             drawPhase[i] = previousPhase[i] + (dots.phase[i] - previousPhase[i]) * blend;
         }
         long geometryStarted = System.nanoTime();
@@ -318,15 +395,21 @@ public final class LatticeRenderer implements Pond {
         if (stepsThisFrame > 0 || !fieldReady) { projectionField(); fieldReady = true; }
         boolean glow = pointBudget >= GLOW_BUDGET;
         int n = dots.getCount();
-        Arrays.fill(glowCounts, 0);
-        for (int t = 0; t < TIERS; t++) Arrays.fill(tierCounts[t], 0);
-        Arrays.fill(lineCounts, 0); Arrays.fill(faintCounts, 0);
-        boolean freshAnchors = dots.structureVersion != anchorVersion || n != anchorCount;
-        double follow = freshAnchors ? 1 : -Math.expm1(-elapsed / .45);
-        anchorVersion = dots.structureVersion; anchorCount = n;
+        if (dots.structureVersion != anchorVersion) {
+            // A new pond: every anchor starts where its dot is.
+            Arrays.fill(anchorFresh, true);
+            anchorVersion = dots.structureVersion;
+        }
+        double follow = -Math.expm1(-elapsed / .45);
         int drawnDots = 0, looseDots = 0;
+        float stroke = (float) Math.max(1.0, extent / 480 * 1.25);
+        double maxBond = 2.6 * DotLattice.SPACING_HINT * extent;
+        // Only what is in the frame is drawn: the pond goes on beyond it. Dots up to
+        // a bond's length outside still count, so bonds run off the edge to real dots.
+        double nearW = unitsW * .5 + .25, nearH = unitsH * .5 + .25, pad = maxBond + 4 * stroke;
+        Arrays.fill(layerCounts, 0);
         for (int i = 0; i < n; i++) {
-            visibleDot[i] = dots.alpha[i] > .35;
+            visibleDot[i] = false;
             int id = dots.bodyOf[i], slot = id >= 0 && id < slotOfId.length ? slotOfId[id] : -1;
             boolean inBody = slot >= 0 && auraCount[slot] > 0;
             // The projection is a smooth field over the screen (see
@@ -334,18 +417,20 @@ public final class LatticeRenderer implements Pond {
             // the same transform, whichever body each belongs to.
             sampleProjection(drawX[i], drawY[i]);
             double presence = projected[5];
+            double f = anchorFresh[i] ? 1 : follow;
+            anchorFresh[i] = false;
             double targetX = drawX[i] + (projected[0] - drawX[i]) * presence;
             double targetY = drawY[i] + (projected[1] - drawY[i]) * presence;
             double targetR = .03 + (projected[2] - .03) * presence;
             double targetDepth = dots.depth[i] + (projected[3] - dots.depth[i]) * presence;
             double targetSpin = dots.spin[i] + (projected[4] - dots.spin[i]) * presence;
-            anchorX[i] += (targetX - anchorX[i]) * follow;
-            anchorY[i] += (targetY - anchorY[i]) * follow;
-            anchorR[i] += (targetR - anchorR[i]) * follow;
-            anchorDepth[i] += (targetDepth - anchorDepth[i]) * follow;
-            anchorSpin[i] += (targetSpin - anchorSpin[i]) * follow;
+            anchorX[i] += (targetX - anchorX[i]) * f;
+            anchorY[i] += (targetY - anchorY[i]) * f;
+            anchorR[i] += (targetR - anchorR[i]) * f;
+            anchorDepth[i] += (targetDepth - anchorDepth[i]) * f;
+            anchorSpin[i] += (targetSpin - anchorSpin[i]) * f;
             if (!inBody) looseDots++;
-            if (!visibleDot[i]) continue;
+            if (dots.alpha[i] <= .35 || Math.abs(drawX[i]) > nearW || Math.abs(drawY[i]) > nearH) continue;
             // Three-dimensional illusion. A body is a domed disc tilted toward
             // or away from the viewer about an axis that slowly turns; nearer
             // bodies (depth, as in the Koi forms) are larger, and the near side
@@ -364,88 +449,78 @@ public final class LatticeRenderer implements Pond {
             double px = (u * ca - v2 * sa) * scale, py = (u * sa + v2 * ca) * scale;
             screenX[i] = (float) (width * .5 + (anchorX[i] + px) * extent + PageDrift.pixelShift(pageCentered, depth, extent));
             screenY[i] = (float) (height * .5 + (anchorY[i] + py) * extent);
-            // Debris far from any body recedes into the smallest, dimmest class.
-            double nearness = (depth + .35 * z2 / radius) * (.35 + .65 * presence)
+            if (screenX[i] < -pad || screenX[i] > width + pad || screenY[i] < -pad || screenY[i] > height + pad) continue;
+            visibleDot[i] = true;
+            // Debris far from any body recedes: smaller and dimmer.
+            double nearness = (depth + .35 * z2 / radius + .12 * (dots.mass[i] - 1)) * (.35 + .65 * presence)
                 + .08 * (((i * 0.7548776662466927) % 1) - .5);
-            int tier = nearness < .62 ? 0 : nearness < .86 ? 1 : 2;
-            double c = Math.cos(drawPhase[i]);
-            // Colour runs as a gradient across each body, diagonally and from
-            // core to rim, so palette drift flows through a body instead of
-            // switching it all at once.
-            double gradient = 0;
-            if (inBody) {
-                double reach = Math.max(.02, dots.bodyRadius[slot] * 1.4);
-                double gx = (drawX[i] - auraX[slot]) / reach, gy = (drawY[i] - auraY[slot]) / reach;
-                gradient = GRADIENT_ARC * .5 * bounded(.82 * gx + .42 * gy, -1, 1)
-                    + RADIAL_ARC * (Math.min(1.3, Math.sqrt(gx * gx + gy * gy)) - .55);
-            }
-            // Ordered dithering: each dot crosses into the next colour step at
-            // its own threshold, so changes ripple through instead of jumping.
-            double steps = wrapDegrees(214 + dots.hue[i] + colorPhase + 9 * c + gradient) * COLOR_BUCKETS / 360;
-            int b = (int) steps;
-            if (steps - b > (i * 0.6180339887498949) % 1) b++;
-            if (b >= COLOR_BUCKETS) b -= COLOR_BUCKETS;
-            dotBucket[i] = b;
-            // The bright half of each dot's rhythm draws one class nearer, so a
-            // body in step pulses as one and waves of rhythm are visible.
-            bright[i] = c > .2;
-            dotTier[i] = Math.min(TIERS - 1, tier + (bright[i] ? 1 : 0));
-            tierCounts[dotTier[i]][b] += 2;
-            glowing[i] = glow && c > .55;
-            if (glowing[i]) glowCounts[b] += 2;
+            // Each dot is drawn in its own colour, exactly: there are no palette
+            // steps, so colour moves through a body as a gradient. Heat is mixed
+            // in as red, as strongly as the vertex is hot.
+            double heat = Math.min(1, dots.redness[i]);
+            int kind = kindColor(214 + dots.hue[i]);
+            dotColor[i] = heat > .004 ? mix(kind, HEAT_COLOR, heat) : kind;
+            // Size and brightness follow nearness and the dot's rhythm smoothly: a
+            // body in step swells and brightens as one on every beat.
+            double beat = .5 + .5 * Math.cos(drawPhase[i]);
+            double near = bounded((nearness - .4) / .7, 0, 1);
+            dotSize[i] = (float) (stroke * (.8 + .62 * near) * (1 + .18 * beat) * (1 + .3 * heat));
+            dotLight[i] = (float) ((.86 + .14 * near) * (.86 + .14 * beat));
+            dotGlow[i] = glow ? (float) Math.max(beat * beat * beat * beat, heat * heat) : 0;
+            int layer = (int) (near * (LAYERS - 1) + .5);
+            dotLayer[i] = layer;
+            layerCounts[layer]++;
             drawnDots++;
         }
         looseFraction = n > 0 ? looseDots / (double) n : 0;
-        double maxBond = 2.6 * DotLattice.SPACING_HINT * extent;
-        double maxBondSquared = maxBond * maxBond;
-        int links = 0;
-        double longest = 0;
+        // Bonds between drawn dots. A snapped bond is not drawn while it fades (it
+        // would stretch as the dots part), nor is one far longer than a lattice bond.
+        double maxBondSquared = maxBond * maxBond, longest = 0;
+        int links = 0, lineQuads = 0;
+        float lineHalf = Math.max(1f, stroke * .3f) * .5f + 1f;
         for (int e = 0; e < dots.edgeCount; e++) {
             int a = dots.edgeA[e], b = dots.edgeB[e];
-            drawBond[e] = false;
-            // A snapped bond is not drawn while it fades: it would stretch as the dots part.
             if (!visibleDot[a] || !visibleDot[b] || dots.edgeDying[e]) continue;
             double s = dots.edgeStrength[e];
             if (s < .08) continue;
-            double lx = screenX[b] - screenX[a], ly = screenY[b] - screenY[a];
-            // A bond is never drawn far longer than a lattice bond can be.
-            if (lx * lx + ly * ly > maxBondSquared) continue;
-            drawBond[e] = true;
-            if (s >= .5) lineCounts[dotBucket[a]] += 4; else faintCounts[dotBucket[a]] += 4;
-            longest = Math.max(longest, lx * lx + ly * ly);
+            float ax = screenX[a], ay = screenY[a], bx = screenX[b], by = screenY[b];
+            double lx = bx - ax, ly = by - ay, length2 = lx * lx + ly * ly;
+            if (length2 > maxBondSquared || length2 < 1e-4) continue;
+            longest = Math.max(longest, length2);
             links++;
+            // A thin quad from dot to dot, each end in its dot's colour: every bond is a gradient.
+            double inverse = lineHalf / Math.sqrt(length2);
+            float nx = (float) (-ly * inverse), ny = (float) (lx * inverse);
+            int v = lineQuads * 8;
+            lineVerts[v] = ax + nx; lineVerts[v + 1] = ay + ny; lineVerts[v + 2] = ax - nx; lineVerts[v + 3] = ay - ny;
+            lineVerts[v + 4] = bx - nx; lineVerts[v + 5] = by - ny; lineVerts[v + 6] = bx + nx; lineVerts[v + 7] = by + ny;
+            int alpha = (int) (84 + 100 * bounded((s - .3) / .4, 0, 1));
+            int ca = withAlpha(dotColor[a], alpha), cb = withAlpha(dotColor[b], alpha), k = lineQuads * 4;
+            lineColors[k] = ca; lineColors[k + 1] = ca; lineColors[k + 2] = cb; lineColors[k + 3] = cb;
+            lineQuads++;
         }
         longestBondPx = Math.sqrt(longest);
-        int pointOffset = 0, glowOffset = 0, lineOffset = 0, faintOffset = 0;
-        for (int t = 0; t < TIERS; t++) {
-            for (int b = 0; b < COLOR_BUCKETS; b++) {
-                tierOffsets[t][b] = pointOffset; tierCursor[t][b] = pointOffset; pointOffset += tierCounts[t][b];
+        // Dots far to near, so nearer dots sit on top, and their glows.
+        for (int l = 0, start = 0; l < LAYERS; l++) { layerStart[l] = start; start += layerCounts[l]; }
+        for (int i = 0; i < n; i++) if (visibleDot[i]) order[layerStart[dotLayer[i]]++] = i;
+        int glowQuads = 0;
+        double glowBase = bounded(72 * moodGlow / .8, 24, 100);
+        for (int q = 0; q < drawnDots; q++) {
+            int i = order[q], v = q * 8, k = q * 4;
+            float cx = screenX[i], cy = screenY[i], h = dotSize[i] * .5f / DISC_FILL;
+            dotVerts[v] = cx - h; dotVerts[v + 1] = cy - h; dotVerts[v + 2] = cx + h; dotVerts[v + 3] = cy - h;
+            dotVerts[v + 4] = cx + h; dotVerts[v + 5] = cy + h; dotVerts[v + 6] = cx - h; dotVerts[v + 7] = cy + h;
+            int color = withAlpha(dotColor[i], (int) (255 * dotLight[i]));
+            dotColors[k] = color; dotColors[k + 1] = color; dotColors[k + 2] = color; dotColors[k + 3] = color;
+            if (dotGlow[i] > .04f) {
+                float g = stroke * 4.2f * (1 + .3f * (float) dots.redness[i]);
+                int w = glowQuads * 8, m = glowQuads * 4;
+                glowVerts[w] = cx - g; glowVerts[w + 1] = cy - g; glowVerts[w + 2] = cx + g; glowVerts[w + 3] = cy - g;
+                glowVerts[w + 4] = cx + g; glowVerts[w + 5] = cy + g; glowVerts[w + 6] = cx - g; glowVerts[w + 7] = cy + g;
+                int glowColor = withAlpha(dotColor[i], (int) (glowBase * dotGlow[i]));
+                glowColors[m] = glowColor; glowColors[m + 1] = glowColor; glowColors[m + 2] = glowColor; glowColors[m + 3] = glowColor;
+                glowQuads++;
             }
-        }
-        for (int b = 0; b < COLOR_BUCKETS; b++) {
-            glowOffsets[b] = glowOffset; glowOffset += glowCounts[b];
-            lineOffsets[b] = lineOffset; lineOffset += lineCounts[b];
-            faintOffsets[b] = faintOffset; faintOffset += faintCounts[b];
-        }
-        System.arraycopy(glowOffsets, 0, cursorB, 0, COLOR_BUCKETS);
-        for (int i = 0; i < n; i++) {
-            if (!visibleDot[i]) continue;
-            int b = dotBucket[i], t = dotTier[i], p = tierCursor[t][b];
-            points[p] = screenX[i]; points[p + 1] = screenY[i]; tierCursor[t][b] += 2;
-            if (glowing[i]) { int g = cursorB[b]; glows[g] = screenX[i]; glows[g + 1] = screenY[i]; cursorB[b] += 2; }
-        }
-        System.arraycopy(lineOffsets, 0, cursorA, 0, COLOR_BUCKETS);
-        System.arraycopy(faintOffsets, 0, cursorB, 0, COLOR_BUCKETS);
-        for (int e = 0; e < dots.edgeCount; e++) {
-            if (!drawBond[e]) continue;
-            int a = dots.edgeA[e], b = dots.edgeB[e];
-            double s = dots.edgeStrength[e];
-            float[] target = s >= .5 ? lines : faintLines;
-            int[] cursor = s >= .5 ? cursorA : cursorB;
-            int bucket = dotBucket[a], p = cursor[bucket];
-            target[p] = screenX[a]; target[p + 1] = screenY[a];
-            target[p + 2] = screenX[b]; target[p + 3] = screenY[b];
-            cursor[bucket] += 4;
         }
         lastPointCount = drawnDots; lastLinkCount = links;
         pollEvents(width, height, extent);
@@ -455,53 +530,58 @@ public final class LatticeRenderer implements Pond {
 
         canvas.drawColor(BACKGROUND);
         if (pointBudget >= AURA_BUDGET) drawAuras(canvas, width, height, extent);
-        float stroke = (float) Math.max(1.0, extent / 480 * 1.25);
-        if (glow) {
-            glowPaint.setStrokeWidth(stroke * 4.6f);
-            int alpha = (int) bounded(34 * moodGlow / .8, 10, 52);
-            for (int b = 0; b < COLOR_BUCKETS; b++) {
-                if (glowCounts[b] == 0) continue;
-                glowPaint.setColor(colors[b]); glowPaint.setAlpha(alpha);
-                canvas.drawPoints(glows, glowOffsets[b], glowCounts[b], glowPaint);
-            }
+        // Three draws in all: glows, bonds, dots, every vertex in its own dot's colour.
+        if (glowQuads > 0) {
+            canvas.drawVertices(Canvas.VertexMode.TRIANGLES, glowQuads * 8, glowVerts, 0, glowTexs, 0,
+                glowColors, 0, QUAD_INDICES, 0, glowQuads * 6, glowPaint);
         }
-        // Bonds are hairlines, a third of a dot's width, and always end at dots.
-        linePaint.setStrokeWidth(Math.max(1f, stroke * .3f));
-        for (int b = 0; b < COLOR_BUCKETS; b++) {
-            if (faintCounts[b] > 0) {
-                linePaint.setColor(colors[b]); linePaint.setAlpha(42);
-                canvas.drawLines(faintLines, faintOffsets[b], faintCounts[b], linePaint);
-            }
-            if (lineCounts[b] > 0) {
-                linePaint.setColor(colors[b]); linePaint.setAlpha(100);
-                canvas.drawLines(lines, lineOffsets[b], lineCounts[b], linePaint);
-            }
+        if (lineQuads > 0) {
+            canvas.drawVertices(Canvas.VertexMode.TRIANGLES, lineQuads * 8, lineVerts, 0, lineTexs, 0,
+                lineColors, 0, QUAD_INDICES, 0, lineQuads * 6, linePaint);
         }
-        // Far classes first, so nearer dots sit on top.
-        for (int t = 0; t < TIERS; t++) {
-            dotPaint.setStrokeWidth(stroke * TIER_WIDTH[t]);
-            for (int b = 0; b < COLOR_BUCKETS; b++) {
-                if (tierCounts[t][b] == 0) continue;
-                dotPaint.setColor(colors[b]); dotPaint.setAlpha(TIER_ALPHA[t]);
-                canvas.drawPoints(points, tierOffsets[t][b], tierCounts[t][b], dotPaint);
-            }
+        if (drawnDots > 0) {
+            canvas.drawVertices(Canvas.VertexMode.TRIANGLES, drawnDots * 8, dotVerts, 0, dotTexs, 0,
+                dotColors, 0, QUAD_INDICES, 0, drawnDots * 6, dotPaint);
         }
         drawFlashes(canvas, elapsed);
         canvasCostMs = (System.nanoTime() - canvasStarted) / 1e6;
     }
 
+    /**
+     * Keeps each dot's drawing state with it when the pond moves a dot to another
+     * slot or a new dot arrives, so no other dot jumps or twitches.
+     */
+    private void followSlots() {
+        int changes = dots.slotChanges;
+        if (changes == 0) return;
+        dots.slotChanges = 0;
+        if (changes > dots.slotFrom.length) { Arrays.fill(anchorFresh, true); saveState(); return; }
+        for (int k = 0; k < changes; k++) {
+            int from = dots.slotFrom[k], to = dots.slotTo[k];
+            if (from < 0) {
+                previousX[to] = dots.px[to]; previousY[to] = dots.py[to]; previousPhase[to] = dots.phase[to];
+                anchorFresh[to] = true;
+            } else {
+                previousX[to] = previousX[from]; previousY[to] = previousY[from]; previousPhase[to] = previousPhase[from];
+                anchorX[to] = anchorX[from]; anchorY[to] = anchorY[from]; anchorR[to] = anchorR[from];
+                anchorDepth[to] = anchorDepth[from]; anchorSpin[to] = anchorSpin[from];
+                anchorFresh[to] = anchorFresh[from];
+            }
+        }
+    }
+
     /** Remembers the state before a physics step, for drawing in between. */
     private void saveState() {
         int n = dots.getCount();
-        System.arraycopy(dots.x, 0, previousX, 0, n);
-        System.arraycopy(dots.y, 0, previousY, 0, n);
+        System.arraycopy(dots.px, 0, previousX, 0, n);
+        System.arraycopy(dots.py, 0, previousY, 0, n);
         System.arraycopy(dots.phase, 0, previousPhase, 0, n);
         savedVersion = dots.structureVersion;
-        savedCount = n;
     }
 
     /** Adds lineages up to the chosen count in the emptiest water, or lets the newest fade away. */
     private void reconcilePopulation() {
+        dots.setTargetCount(requestedCount * DOTS_PER_BODY);
         int active = Integer.bitCount(activeLineages);
         while (active < requestedCount) {
             int lineage = Integer.numberOfTrailingZeros(~activeLineages);
@@ -544,7 +624,6 @@ public final class LatticeRenderer implements Pond {
         chaos.sample(0, chaosSample);
         // Crowding climate: with Vary count, the long-range push breathes with the chaos ring.
         climate = .75 + .35 * chaosSample[0];
-        colorPhase += elapsed * colorSpeed * 10 * chaosSample[3];
         if (ticks > 0 || !waterReady) {
             for (int gy = 0; gy < GRID_Y; gy++) {
                 for (int gx = 0; gx < GRID_X; gx++) {
@@ -558,11 +637,13 @@ public final class LatticeRenderer implements Pond {
             double bandSum = 0;
             for (int band = 0; band < 8; band++) bandSum += world.getBandEnergy(band);
             double activity = bounded(world.getActivity() * 4.5, 0, 1), energy = bounded(bandSum * 2.8, 0, 1);
-            // Life generations carry the palette onward, faster when the world is busy.
-            colorPhase += generationSeconds * colorSpeed * (14 + 35 * activity + 18 * energy + 35 * worldDensity);
+            // Colours, and with them kinds, drift faster when the world is busy.
+            hueDriftTarget = colorSpeed * (2 + 5 * activity + 3 * energy);
             tendTheWorld(generationSeconds);
         }
-        colorPhase = wrapDegrees(colorPhase);
+        // The drift's rate eases toward the world's pace, so colours shift steadily.
+        hueDriftNow += (hueDriftTarget - hueDriftNow) * -Math.expm1(-elapsed / 20);
+        dots.setHueDrift(hueDriftNow);
     }
 
     /** Once per generation: colour spreads; bodies seed life and paint their hue; dots absorb the water's colour. */
@@ -578,7 +659,7 @@ public final class LatticeRenderer implements Pond {
         }
         double absorb = -Math.expm1(-generationSeconds * motionSpeed / TINT_ABSORB_SECONDS);
         for (int i = 0; i < dots.count; i++) {
-            tint.sample(.5 + dots.x[i] / unitsW, .5 + dots.y[i] / unitsH, tintSample);
+            tint.sample(.5 + dots.px[i] / unitsW, .5 + dots.py[i] / unitsH, tintSample);
             if (tintSample[1] <= .05) continue;
             dots.hue[i] = wrapDegrees(dots.hue[i] + DotLattice.arc(tintSample[0] - dots.hue[i]) * tintSample[1] * absorb);
         }
@@ -691,8 +772,8 @@ public final class LatticeRenderer implements Pond {
             int save = canvas.save();
             canvas.translate(cx, cy);
             canvas.scale(radius, radius);
-            auraPaint.setShader(auraShaders[hueBucket(214 + dots.bodyHue[slot] + colorPhase)]);
-            auraPaint.setAlpha((int) bounded(85 * moodGlow * Math.min(1, size) * (.45 + .55 * depth), 0, 130));
+            auraPaint.setShader(auraShaders[hueBucket(214 + dots.bodyHue[slot])]);
+            auraPaint.setAlpha((int) bounded(110 * moodGlow * Math.min(1, size) * (.45 + .55 * depth), 0, 150));
             canvas.drawCircle(0, 0, 1, auraPaint);
             canvas.restoreToCount(save);
         }
@@ -703,14 +784,14 @@ public final class LatticeRenderer implements Pond {
         for (long s = Math.max(lastEventSerial + 1, serial - 15); s <= serial; s++) {
             if (dots.readEvent(s, eventOut) == 0) continue;
             addFlash(width * .5 + eventOut[0] * extent, height * .5 + eventOut[1] * extent,
-                extent * .16, hueBucket(214 + eventOut[2] + colorPhase));
+                extent * .16, hueBucket(214 + eventOut[2]));
         }
         lastEventSerial = serial;
     }
     private void releasePendingFlashes(int width, int height, double extent) {
         for (int k = 0; k < pendingCount; k++) {
             double hue = finite(pendingHue[k]) ? pendingHue[k]
-                : dots.bodyCount > 0 ? 214 + dots.bodyHue[0] + colorPhase : 200;
+                : dots.bodyCount > 0 ? 214 + dots.bodyHue[0] : 200;
             addFlash(pendingU[k] * width, pendingV[k] * height, extent * .22 * pendingSize[k], hueBucket(hue));
         }
         pendingCount = 0;
@@ -742,10 +823,90 @@ public final class LatticeRenderer implements Pond {
     }
 
     private void updatePalette() {
+        if (paletteReady) return;
         for (int b = 0; b < COLOR_BUCKETS; b++) {
-            hsv[0] = b * (360f / COLOR_BUCKETS); hsv[1] = .86f; hsv[2] = 1;
+            double hue = b * 360.0 / COLOR_BUCKETS;
+            hsv[0] = (float) hue; hsv[1] = (float) kindSaturation(hue); hsv[2] = 1;
             colors[b] = Color.HSVToColor(hsv);
         }
+        paletteReady = true;
+    }
+
+    /** Full saturation, so colours pop, except near pure red, which is kept for heat. */
+    private static double kindSaturation(double hue) {
+        double nearRed = Math.max(0, Math.cos(Math.toRadians(hue)));
+        return 1 - .3 * Math.pow(nearRed, 8);
+    }
+
+    private int kindColor(double hue) {
+        int k = (int) (wrapDegrees(hue) * (KIND_STEPS / 360.0));
+        return kindPalette[k >= KIND_STEPS ? k - KIND_STEPS : k];
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0xFFFFFF);
+    }
+
+    private static int mix(int from, int to, double amount) {
+        int r = (int) (Color.red(from) + (Color.red(to) - Color.red(from)) * amount);
+        int g = (int) (Color.green(from) + (Color.green(to) - Color.green(from)) * amount);
+        int b = (int) (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * amount);
+        return Color.rgb(r, g, b);
+    }
+
+    /** Two triangles per quad: corners 0-1-2 and 0-2-3. */
+    private static short[] quadIndices(int quads) {
+        short[] indices = new short[quads * 6];
+        for (int q = 0; q < quads; q++) {
+            int v = q * 4, k = q * 6;
+            indices[k] = (short) v; indices[k + 1] = (short) (v + 1); indices[k + 2] = (short) (v + 2);
+            indices[k + 3] = (short) v; indices[k + 4] = (short) (v + 2); indices[k + 5] = (short) (v + 3);
+        }
+        return indices;
+    }
+
+    private static float[] quadTexs(int quads, int size) {
+        float[] texs = new float[quads * 8];
+        for (int q = 0; q < quads; q++) {
+            int v = q * 8;
+            texs[v + 2] = size; texs[v + 4] = size; texs[v + 5] = size; texs[v + 7] = size;
+        }
+        return texs;
+    }
+
+    /** Across a bond, the line's cross-section; along it, constant. */
+    private static float[] lineTexs(int quads) {
+        float[] texs = new float[quads * 8];
+        for (int q = 0; q < quads; q++) {
+            int v = q * 8;
+            texs[v + 1] = .5f; texs[v + 2] = LINE; texs[v + 3] = .5f;
+            texs[v + 4] = LINE; texs[v + 5] = .5f; texs[v + 7] = .5f;
+        }
+        return texs;
+    }
+
+    /** A white disc with a smooth edge, or a soft round halo. */
+    private static Bitmap sprite(int size, boolean halo) {
+        int[] pixels = new int[size * size];
+        double centre = size / 2.0;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                double r = Math.hypot(x + .5 - centre, y + .5 - centre) / centre;
+                double a = halo ? Math.exp(-4.5 * r * r) * bounded((1 - r) / .2, 0, 1)
+                    : bounded((DISC_FILL - r) * centre + .5, 0, 1);
+                pixels[y * size + x] = Color.argb((int) Math.round(255 * a), 255, 255, 255);
+            }
+        }
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        bitmap.setPixels(pixels, 0, size, 0, 0, size, size);
+        bitmap.setHasMipMap(true);
+        return bitmap;
+    }
+
+    private static Bitmap lineProfile() {
+        Bitmap bitmap = Bitmap.createBitmap(LINE, 1, Bitmap.Config.ARGB_8888);
+        bitmap.setPixels(new int[] {0x00FFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00FFFFFF}, 0, LINE, 0, 0, LINE, 1);
+        return bitmap;
     }
 
     // ------------------------------------------------------------------ reports
@@ -770,7 +931,6 @@ public final class LatticeRenderer implements Pond {
     double getLooseFraction() { return looseFraction; }
     public LifeField getLifeField() { return world; }
     DotLattice getLattice() { return dots; }
-    public double getColorPhaseDegrees() { return colorPhase; }
 
     private static int hueBucket(double hue) {
         return Math.min(COLOR_BUCKETS - 1, (int) (wrapDegrees(hue) * COLOR_BUCKETS / 360));

@@ -1,6 +1,6 @@
 # How Koiros evolves
 
-Koiros 3.0 has two models, chosen under **Model** in the app.
+Koiros 3.1 has two models, chosen under **Model** in the app.
 
 - **Emergent lattice** (the default) reduces the pond to the equations each dot obeys. Nothing above the dot is scripted: bodies, their textures, spirals, synchrony, fusion and division come out of those equations.
 - **Classic forms** keeps the ten Artificial Koi point equations and the shared-world behaviour of Koiros 2.0, described [further down](#classic-forms).
@@ -11,51 +11,146 @@ Both live in the same hidden Game of Life world, which is never drawn.
 
 ### What a dot is
 
-Each dot *i* has a position **x**ᵢ and velocity **v**ᵢ, a rhythm θᵢ, a hue *h*ᵢ, a spin *s*ᵢ, a swimming heading ψᵢ, a depth *d*ᵢ and a valence *V*ᵢ (2 to 6: the most bonds it can hold). It also belongs to a lineage, the group it was born in, which fixes its natural rhythm and what its colour, spin and depth relax back toward. Lengths are in units of the screen's shorter side (the lattice spacing *a* = 0.025, about 32 px on a 1280-px-wide screen); time is pond seconds, which run at Drift × 1.5 real seconds.
+Each dot *i* has a position in four dimensions (two on the screen and two hidden, see [Hidden dimensions](#hidden-dimensions)) and a velocity. It also has:
+- a rhythm θᵢ and a hue *h*ᵢ;
+- a heat *r*ᵢ between 0 and 1;
+- a spin *s*ᵢ and a swimming heading ψᵢ;
+- a depth *d*ᵢ;
+- a valence *V*ᵢ, 2 to 6: the most bonds it can hold.
+
+It belongs to a lineage, the group it was born in. The lineage fixes its natural rhythm and what its colour, spin and depth lean back toward. Lengths are in units of the screen's shorter side: the lattice spacing *a* = 0.025, about 32 px on a 1280-px-wide screen. Time is in pond seconds, which run at Drift × 1.5 real seconds.
+
+### Colour is kind
+
+A dot's colour sets its properties, the way an element's place in the table sets an atom's. With *H* the colour as drawn (the hue plus 214°), each property peaks at its own colour:
+
+| Property | Rule | Peaks at |
+|---|---|---|
+| Bond length | × (1 + 0.085 cos(*H* − 45°)) | orange-yellow: open, airy lattices |
+| Breathing | 0.14 + 0.09 cos(*H* − 120°) | green |
+| Valence | lineage valence + round(0.9 cos(*H* − 200°)), 2 to 6 | cyan-blue: an extra bond, so crystals; a dot that loses valence lets its longest bonds go |
+| Swimming | × (1 + 0.37 cos(*H* − 290°)) | violet |
+| Mass | (1 + 0.615 cos(*H* − 220°)) · (1 + 0.12 (*k* − 2)) · (1 − 0.45 *r*), 0.35 to 3, for *k* bonds | blue is heavy, bonds add mass, heat makes a vertex light |
+
+Mass divides every force on a dot, its own drive included.
+
+Colour flows, and the properties flow with it:
+- **Relaxes:** toward the dot's remembered colour at 1/16 per pond second. The target is shifted by the hidden Life pattern under the dot (±70°) and by how deep inside a body it sits (±35°), which paints gradients across bodies.
+- **Diffuses** along bonds at 0.1.
+- **Drifts** with **Color drift**: faster when the Life world is busy. The rate itself eases over 20 seconds, so colours shift steadily.
+- **Remembers:** the memory learns what the dot became (time constant 120 pond seconds, not while it is hot) and leans back toward its lineage's own colour (90 pond seconds). Each lineage's colour drifts at its own rate, 0.7 to 1.3 times the drift. Lineages keep distinct colours through fusion and division, so a fused body shows its lineages as colour patches and gradients, and which colours meet keeps changing.
 
 ### Bonds: the propensity to make lattices
 
 Two unbonded dots within reach (their exclusion distance plus 0.2*a*), each with a free valence, bond at rate
 
-  *k*ₒₙ = 5 · *R* · ((1 + cos(θᵢ − θⱼ)) / 2)² · (0.3 + 0.7 · (1 + cos(*h*ᵢ − *h*ⱼ)) / 2) · *Q*
+  *k*ₒₙ = 5 · *R* · ((1 + cos(θᵢ − θⱼ)) / 2)² · (0.3 + 0.7 · (1 + cos(*h*ᵢ − *h*ⱼ)) / 2) · (1 − *r*ᵢ*r*ⱼ)(1 + 0.195 |*r*ᵢ − *r*ⱼ|) · *Q*
 
-so dots bond most readily when they are in step and alike in colour. *R* is the rewiring rate set by **Shape evolution**, and *Q* = (1 − *c*ᵢ)(1 − *c*ⱼ) applies only between different lineages (quorum, below). A bond is a damped spring whose rest length breathes with the two rhythms:
+so dots bond most readily when they are in step and alike in colour. Hot vertices hardly bond to each other but bond readily to cool ones. *R* is the rewiring rate set by **Shape evolution**, and *Q* = (1 − *c*ᵢ)(1 − *c*ⱼ) applies only between different lineages (see Quorum below). A bond is a damped spring whose rest length breathes with the two rhythms:
 
   *L* = *a* · ½(*g*ₛᵢ + *g*ₛⱼ) · (1 + ½(*g*ᵦᵢ + *g*ᵦⱼ) · (cos θᵢ + cos θⱼ) / 2),  **F** = *σ* [36 (*r* − *L*) + 2.5 (Δ**v** · **r̂**)] **r̂**
 
-where *g*ₛ and *g*ᵦ are each dot's bond-length and breathing genes (see [Rules that evolve](#rules-that-evolve)).
+where *g*ₛ and *g*ᵦ are the bond length and breathing set by each dot's colour.
 
 Its strength *σ* grows from 0 to 1 over 0.45 pond seconds, and fades out over 0.35 when it breaks. A bond snaps when stretched past 1.85*a*, and otherwise at hazard rate
 
-  0.35 · *R* · [0.05 + ((1 − cos(θᵢ − θⱼ)) / 2)² + 0.6 *u*² + 2.5 *c̄*]
+  0.35 · *R* · [0.05 + ((1 − cos(θᵢ − θⱼ)) / 2)² + 0.6 *u*² + 2.5 *c̄* + 2 *r*ᵢ*r*ⱼ]
 
 where *u* is the local restlessness of the Life world (the fraction of cells that changed nearby) and *c̄* the pair's mean quorum crowding. Bonds that meet at a dot repel in angle (energy 0.12 *a* cos φ for each pair), so a dot's bonds spread evenly: three open to 120°, four to 90°, six to 60°.
 
-All dots repel inside 0.72*a*. Unbonded dots also keep an exclusion distance that depends on valence, from 1.0*a* for six bonds to 1.6*a* for two, so dots that hold few bonds make open lattices: chains, honeycomb nets, square nets.
+All dots repel inside 0.72*a*. Unbonded dots also keep an exclusion distance that depends on valence, from 1.0*a* for six bonds to 1.6*a* for two, so dots that hold few bonds make open lattices: chains, honeycomb nets, square nets. Between hot vertices it grows by a factor of 1 + 0.514 √(*r*ᵢ*r*ⱼ).
+
+### Heat: crowded vertices glow red
+
+A vertex's pressure is how crowded it is per bond it holds:
+
+  ℓᵢ = *n*ᵢ / (1 + 0.5 *k*ᵢ),  *p*ᵢ = clamp((ℓᵢ − 3.6) / 1.5, 0, 1)
+
+where *n*ᵢ counts the dots within 1.35*a* (bonded or not) and *k*ᵢ is its strength-weighted bond count. Heat follows pressure: it rises toward *p*ᵢ at 0.444 per pond second and cools toward it at 0.25.
+
+In a well-knit lattice each neighbour is a bond, and a vertex stays cool. A crushed core heats, and so does a loose dot in a crowd. Heat is drawn as red and is a vertex's most repulsive state:
+- **Repels:** hot vertices keep each other further apart.
+- **Gathers less:** a fully hot vertex drifts outward.
+- **Frays:** hot–hot bonds fray.
+- **Links outward:** hot vertices bond to cool vertices on the outer shell.
+- **Lightens:** heat makes a vertex light.
+
+A crowded cluster therefore unfolds into new shapes and cools as it spreads.
 
 ### What travels along bonds
 
 Weighted by bond strength and normalised by each dot's total bond weight:
 
-- Rhythm (Kuramoto coupling): θ̇ᵢ = ω*ₗ* εᵢ *m* + 2.4 ⟨sin(θⱼ − θᵢ)⟩ + 0.9 *K*ᵢ, where ω*ₗ* is the lineage's natural frequency, εᵢ a fixed ±2% per dot, *m* the mood, and *K*ᵢ the pull of the local mean rhythm in the near field (below).
-- Colour: *ḣ*ᵢ = 0.7 ⟨arc(*h*ⱼ − *h*ᵢ)⟩ + arc(*h*ᵢ⁰ − *h*ᵢ) / 40, relaxing toward the lineage colour *h*ᵢ⁰; the hidden water's colour is also absorbed where the dot swims.
-- Spin and depth diffuse the same way (rates 0.5 and 0.4) and relax toward the lineage's values over 30 and 25 pond seconds.
-- Heading: ψ̇ᵢ = 2.0 ⟨sin(ψⱼ − ψᵢ)⟩ plus a slow random turn.
+- **Rhythm** (Kuramoto coupling): θ̇ᵢ = ω*ₗ* εᵢ *m* (1 + 0.095 (ρ̃ᵢ − 0.8)) + 2.53 *E*ʷᵢ ⟨sin(θⱼ − θᵢ)⟩ + 0.783 *E*ʷᵢ *K*ᵢ.
+  - ω*ₗ*: the lineage's natural frequency.
+  - εᵢ: a fixed ±2% per dot.
+  - *m*: the mood.
+  - ρ̃ᵢ: how deep in a body the dot sits. Deeper dots keep slightly faster time (a pacemaker), so cores lead and phase waves travel to the rim.
+  - *K*ᵢ: the pull of the local mean rhythm in the near field.
+  - *E*ʷᵢ: the exclusion factor at body scale (below).
+- **Colour:** as above, diffusing at 0.1.
+- **Spin and depth** diffuse the same way (rates 0.5 and 0.4) and relax toward the lineage's values over 30 and 25 pond seconds.
+- **Heading:** ψ̇ᵢ = 2.0 ⟨sin(ψⱼ − ψᵢ)⟩, plus a slow random turn.
+
+### A continuous exclusion principle
+
+The dots are deposited on a coarse grid (cells of 0.0625) at their positions on the screen, and blurred at two scales: *near* (σ = 0.06, a few spacings) and *wide* (σ = 0.30). The near field is also weighted by cos θ and sin θ, so each dot can sense the density of dots *in step with it*, its same-state occupancy:
+
+  *n*ᵢ = (ρ_cos cos θᵢ + ρ_sin sin θᵢ) / ρ_lattice,  *E*ᵢ = clamp(1 − (*n*ᵢ / 1.4)³, −1.5, 1)
+
+ρ_lattice is the density of a relaxed lattice. The same law with the total near density gives *B*ᵢ for all dots, in step or not. Gathering is scaled by these factors, so the pull together fades as packing nears 1.4 times a relaxed lattice and turns into a push apart beyond it. Rhythm coupling follows the same law at body scale (the wide field, critical at 1.15), *E*ʷᵢ: a body in step stays in step, while an over-full same-state crowd falls out of step. Sensed at the dot's own scale, it loosened the tightest cores' rhythm: phase order within bodies fell from about 0.89 to 0.76. While *E*ᵢ < 0, a degeneracy pressure (0.02 |*E*ᵢ|) also pushes the dot down the body-scale gradient of dots in step with it. Many dots can share a place only by occupying different rhythms, and no body can crush itself.
 
 ### How a dot moves: swarmalator terms
 
-The dots are deposited on a coarse grid (cells of 0.0625) and blurred at two scales: *near* (σ = 0.06) and *wide* (σ = 0.30). The near field is also weighted by cos θ and sin θ, so each dot can sense the density of dots *in step with it*. This follows the swarmalator model of O'Keeffe, Hong and Strogatz (2017), in which oscillators attract more strongly when their phases agree. The walls mirror the field.
+The gathering follows the swarmalator model of O'Keeffe, Hong and Strogatz (2017), in which oscillators attract more strongly when their phases agree. Each dot relaxes (drag 6 per pond second, divided by its mass, implicitly integrated) toward the velocity
 
-Each dot relaxes (drag 6 per pond second, implicitly integrated) toward the velocity
-
-  **v**\* = κᵢ [0.0025 ∇ρₙₑₐᵣ + 0.0035 ∇(ρ_cos cos θᵢ + ρ_sin sin θᵢ)]  (gather, harder toward dots in step)
-     + 0.065 *s*ᵢ **ẑ** × ∇̂ρₙₑₐᵣ · min(1, |∇ρₙₑₐᵣ| / 2.5)  (swirl around the density it feels)
-     + 0.026 *g*ᵥᵢ (cos ψᵢ, sin ψᵢ)  (swim, scaled by the swimming gene)
+  **v**\* = κᵢ [0.0025 *B*ᵢ ∇ρₙₑₐᵣ + 0.00506 *E*ᵢ ∇(ρ_cos cos θᵢ + ρ_sin sin θᵢ)]  (gather, harder toward dots in step)
+     + 0.0939 *s*ᵢ **ẑ** × ∇̂ρₙₑₐᵣ · min(1, |∇ρₙₑₐᵣ| / 2.5)  (swirl around the density it feels)
+     + strokes (below)
+     + 0.026 *g*ᵥᵢ (cos ψᵢ, sin ψᵢ)  (swim, scaled by its colour's swimming)
      + 0.02 **u**_Life  (the Life current)
-     − 0.010 · (1 − ς) · *climate* · ∇ρ_wide  (spread: bodies keep apart)
-     + 0.03 · ς · ∇̂ρ_wide  (a dot in sparse surroundings climbs toward the nearest crowd)
+     − 0.0072 · (1 − ς) · *climate* · ∇ρ_wide  (spread: bodies keep apart)
+     + 0.0465 · ς · ∇̂ρ_wide  (a dot in sparse surroundings climbs toward the nearest crowd)
 
-plus the bond, angle and spacing forces, walls (dots within 0.14 of a wall are eased away and turn their heading back), a little thermal jitter that grows where Life is restless, and a person's touch or welcome. κᵢ = (0.4 + 0.6 *V*ᵢ / 6)(1 − 0.9 *c*ᵢ)(1 + 1.2 (1 − *n*ᵢ / *V*ᵢ)): dots that hold more bonds gather harder, so dense cores sort inward (differential adhesion); crowded dots gather less; and dots with unused valence (*n*ᵢ bonds of *V*ᵢ) seek company harder. ς = clamp(1 − ρ_near / 0.5, 0, 1) is how sparse a dot's own neighbourhood is, so shed fragments drift back to bodies instead of being pushed away. With **Vary**, the climate factor breathes with the coupled chaotic drive.
+plus the bond, angle and spacing forces, the frame (below), a little thermal jitter that grows where Life is restless, and a person's touch or welcome.
+
+- **κᵢ** = (0.4 + 0.6 *V*ᵢ / 6)(1 − 0.9 *c*ᵢ)(1 + 1.2 (1 − *k*ᵢ / *V*ᵢ))(1 − 1.08 *r*ᵢ). Dots that hold more bonds gather harder, so dense cores sort inward (differential adhesion). Crowded and hot dots gather less, and dots with unused valence seek company harder.
+- **ς** = clamp(1 − ρ_near / 0.5, 0, 1) is how sparse a dot's own neighbourhood is, so shed fragments drift back to bodies instead of being pushed away.
+- **Vary:** the climate factor breathes with the coupled chaotic drive.
+
+**Strokes.** Each dot also moves to its own rhythm, relative to the density it feels:
+- **In and out:** 0.0278 cos θᵢ along ∇̂ρₙₑₐᵣ.
+- **Around:** 0.0033 *s*ᵢ sin θᵢ.
+- **Circle:** a small circle along its heading, 0.0087 (cos(θᵢ + ψᵢ), sin(θᵢ + ψᵢ)).
+
+In a body in step, every dot strokes together; where phases lag, the strokes travel through it as waves.
+
+### Hidden dimensions
+
+Each dot has two hidden coordinates.
+- **Interactions:** bonds, spacing, bending and exclusion act in all four dimensions. Everything sensed at the scale of crowds acts on the dot's shadow on the screen and is lifted back into four dimensions along the directions the projection mixes: gathering, swirl, spread, the current, the frame, touch and strokes.
+- **Room:** the hidden room opens over the first minute: a restoring pull beyond ±0.02, and a hard wall at ±0.05.
+- **Projection:** what you see is the shadow:
+
+    *x*_screen = *x* cos *A* + *z*₁ sin *A*,  *y*_screen = *y* cos *B* + *z*₂ sin *B*
+
+  The angles swing slowly: *A* = 0.433 sin(2π*t*/61 + φ_A) and *B* = 0.433 sin(2π*t*/89 + φ_B). The arrangement turns past the screen, and forces between dots come and go.
+
+### An open frame
+
+The screen is a window onto a larger pond.
+- **Edge zone:** within 0.14 of an edge, swimmers turn their heading back and are eased inward.
+- **Shore:** beyond the edge, a pull back proportional to the distance *b* out, fading as (1 − *b*/0.18)² to nothing at the far side of a 0.18 margin. A dot carried that far has left.
+- **Spill:** all of this holds fully while the pond is at its size (the chosen **Lineages** × 270 dots), weakens as it fills past it, and reverses beyond 5% over. An over-full pond overflows at its rim.
+- **Arrivals:** groups arrive from beyond the edges, 0.06 per pond second until the pond is 4% over its size, plus 0.1 for each tenth it is short. So groups keep coming and going while the pond stays within a few percent of its size.
+
+Each arriving group slides in through a random point of the edges, a row at a time, placed so that its shadow enters there. Every group differs:
+- **Size:** 6 to 76 vertices.
+- **Shape:** a thin stream (rows of one or two) or a broad band (three to eight across), entering as a triangular lattice.
+- **Density:** 0.75 to 1.95 spacings apart.
+- **Speed:** 0.03 to 0.12 per pond second, with an entry drive that fades over 12 pond seconds.
+- **Colour:** its lineage's colour ± 40°, and with it its kind.
+- **Depth and rhythm:** a random depth, and the lineage's rhythm and spin.
 
 ### Quorum
 
@@ -65,73 +160,64 @@ plus the bond, angle and spacing forces, walls (dots within 0.14 of a wall are e
 
 Each lineage's natural frequency (3.7 radians per pond second, ±12%) follows an Ornstein–Uhlenbeck walk with a time constant of 15 pond seconds divided by *R*. Which bodies can lock into one rhythm therefore keeps changing.
 
-### Rules that evolve
-
-Each dot carries three genes: its preferred bond length *g*ₛ (a multiplier of *a*, 0.8 to 1.35), its breathing strength *g*ᵦ (0.04 to 0.3) and its swimming drive *g*ᵥ (0.5 to 1.8). Each gene has an expressed value, used by the equations, and a remembered one.
-
-- **Shared:** expressed genes diffuse along bonds (rate 0.4, weighted like rhythm). A fused body blends its genomes.
-- **Expressed toward what the surroundings favour:** each gene relaxes, at 0.1 × *R* per pond second, toward its remembered value shifted by the hidden world. The local Life pattern *p* ∈ [−1, 1] shortens the favoured bond length by 0.08 *p* and strengthens swimming by 0.3 *p*. Restless water strengthens breathing by 0.12 (*u* − 0.3).
-- **Remembered and inherited:** the remembered value learns what the dot has become (time constant 50 pond seconds). It also relaxes toward its lineage's genome and mutates slightly, more in restless water. A divided body therefore carries what it became while fused.
-- **Lineages drift:** each lineage's genome follows its own Ornstein–Uhlenbeck walk around where it began (bond length ±0.15, breathing ±0.07, swimming ±0.35, time constant 45 pond seconds / *R*). Lineages never converge, and which genomes meet keeps changing.
-- **Spin learns:** the spin a dot remembers follows the spin its body actually has, so rotation is inherited through fusion and division.
-
-Valence stays structural: lacy, low-valence rims are where bodies tear and divide, and letting valence evolve as well made oversized bodies common in 30-minute runs.
-
 ### What emerges
 
 None of these is written anywhere in the code; they are what the equations do:
 
-- **Bodies.** Connected groups of bonds, each with its own texture: crystal cores (six-bond dots sort inward), open nets, and lacy chains at the rim.
-- **Spirals.** Spiral arms form from swirl that is strongest at a body's edge, together with rewiring.
-- **Synchrony.** Bodies pulse in one rhythm, with visible waves where they are not quite locked.
-- **Fusion.** Bodies that fall into step attract and bond, and colour, spin and depth average along the new bonds.
-- **Division.** Rhythms that cannot stay locked drift out of step: out-of-step bonds fray, and attraction between them turns to repulsion. Quorum also loosens bodies that grow too large.
-- **Exchange.** Dots exchanged in a fusion or division carry their lineage's colour memory into their new body.
-- **Spread.** Bodies use the whole screen.
+- **Shapes.** Open, lacy lattices that take on rings, loops, crescents, curled arms and webs. Crystal cores form where six-bond dots sort inward, and lacy chains at the rim.
+- **Unfolding.** A cluster that packs too tight heats, glows red at its most crowded vertices, and unfolds: hot vertices push apart and link outward.
+- **Synchrony.** Bodies stroke and pulse in one rhythm, with waves travelling from their cores where they are not quite locked.
+- **Fusion and division.** Bodies that fall into step attract and bond. Rhythms that cannot stay locked drift out of step, out-of-step bonds fray, and attraction turns to repulsion; quorum also loosens bodies that grow too large.
+- **Colour.** Gradients by depth and by the hidden pattern, and patches where lineages meet. Since colour sets kind, a body's texture shifts as its colours do.
+- **Exchange.** Groups drift in, parts of bodies drift out over the edges, and fused bodies carry their lineages' colours into the bodies they divide into.
 
 ### What is set, not emergent
 
-- Each lineage's recipe of valences (centre to rim), colour, spin, depth, natural rhythm and starting genes.
-- The starting arrangement, which is random on every start: groups of random size land at random, well-spread places, as lumpy tilted clouds with part of each group still loose.
-- The drawing. The colour gradient across each body, the depth classes, and the tilted-dome projection that gives the three-dimensional look are presentation, not dynamics.
-- Fusions and divisions are only *observed*, for the flashes and the log. A fusion is counted when at least four grown bonds join two earlier bodies of 36 or more dots; a division when a body's dots end up in two groups of 36 or more.
+- **Lineages:** each lineage's recipe of valences (centre to rim), colour, spin, depth and natural rhythm.
+- **Starting arrangement:** random on every start. Groups of random size land at random, well-spread places, as lumpy tilted clouds with part of each group still loose.
+- **Arrivals:** the random size, shape, density, speed, colour and point of entry of each arriving group.
+- **Drawing:** the depth layers and the tilted-dome projection that give the three-dimensional look are presentation, not dynamics.
+- **Events:** fusions and divisions are only *observed*, for the flashes and the log. A fusion is counted when at least four grown bonds join two earlier bodies of 36 or more dots; a division when a body's dots end up in two groups of 36 or more.
 
 ### Drawing
 
-Every line is a bond and ends at two drawn dots. Lines are hairlines about a third of a dot's width. There are no free-floating threads, and the Life world and the water are never drawn.
-
-- **Glow:** dots in the bright half of their rhythm draw one size class larger and carry a faint glow.
-- **Colour:** colour runs as a gradient across each body, diagonally and from core to rim, about 130° in all. Each dot crosses into the next of the 48 colour steps at its own threshold, so palette drift flows through a body rather than switching it at once.
-- **Depth:** each body is drawn as a domed disc tilted toward or away from you about a slowly turning axis. Nearer bodies are larger, and a dome's near side is larger and brighter.
+- **Bonds:** every line is a bond and ends at two drawn dots. Lines are hairlines about a third of a dot's width. The Life world and the water are never drawn.
+- **Exact colour:** each dot is drawn in its own colour, with no palette steps, and every bond is a gradient between its two dots' colours. Colour moves through bodies as a gradient instead of switching.
+- **Heat:** heat is mixed in as a vivid red, as strongly as the vertex is hot, and hot vertices glow red. The kinds' own colours are slightly softer near pure red, so vivid red always means heat.
+- **The beat:** a dot's size and brightness follow its nearness and its rhythm smoothly, so a body in step swells and brightens as one on every beat, and its dots glow near the top of it.
+- **Depth:** each body is drawn as a domed disc tilted toward or away from you about a slowly turning axis. Nearer bodies are larger, and a dome's near side is larger and brighter. Dots are drawn far to near.
 - **Parallax:** home-page swipes shift near dots farther than far ones.
-- **Projection without tearing:** the projection is a smooth field over the screen, blended from nearby bodies, so bonded neighbours always get nearly the same transform. A snapped bond is not drawn while it fades, and no bond is drawn longer than 2.6 spacings.
-- **Debris recedes:** fragments far from any body draw in the smallest, dimmest class.
+- **No tearing:** the projection is a smooth field over the screen, blended from nearby bodies, so bonded neighbours always get nearly the same transform. A snapped bond is not drawn while it fades, and no bond is drawn longer than 2.6 spacings.
+- **Steady state:** when the pond moves a dot to another slot, or a group arrives, the drawing state follows each dot, so nothing else twitches.
+- **Edges:** dots are drawn up to a bond's length beyond the edge, so bonds run off the screen to real dots.
 - **Flashes:** a soft glow marks each fusion and division, with no ring.
+
+Dots, glows and bonds are drawn as three batches of textured quads, every vertex in its dot's colour.
 
 ### Cost
 
-Physics advances in fixed steps of 0.025 pond seconds. Frames between steps draw positions interpolated between the last two states, so work follows Drift rather than the display rate: at Drift 0.11 that is about 6.6 steps a second, however many frames are drawn.
+Physics advances in fixed steps of 0.025 pond seconds. Frames between steps draw positions interpolated between the last two states, so work follows Drift rather than the display rate: at Drift 0.11 that is about 6.6 steps a second, however many frames are drawn. Because bodies are no longer crushed, each dot has a handful of close neighbours instead of dozens, so a step costs well under half what it did when bodies collapsed into balls.
 
 ### Measured
 
-On screen during a real home-screen visit (the build just before the evolving rules; drawing cost is unchanged): 3.6–5.1 ms of main-thread work per frame while touched at 60 fps (about a quarter of one CPU core) and 3.6–4.5 ms per frame at the idle 24 fps (about a tenth of a core), close to the classic forms' 2.0 figures.
+Offscreen Android renders on the author's phone (seven lineages of about 270 dots, 1 Hz Life, Shape evolution 0.10, Colour drift 0.41), 300 pond seconds each, run at Drift 0.5 so a long run fits in a few minutes:
 
+| | Now | Bodies collapsing (before the local exclusion) |
+|---|---|---|
+| Screen lit at any moment | 34% (every part lit at some point) | 7% |
+| Physics step, 1,890 dots | about 3.4 ms | about 8.8 ms |
+| Dots holding a bond | 99% | 97% |
+| Colour spread within a body | about 35° | about 10° |
 
-Offscreen Android renders on the person's phone at their settings (Drift 0.11, Shape evolution 0.10, Colour drift 0.41, seven lineages of about 270 dots, 1 Hz Life), 4 to 5 minutes each:
+Other figures from the same renders:
+- **Loose dots:** 5%.
+- **Hot vertices** (heat over 0.3): about 2%.
+- **Pond size:** 103% of its target on average.
+- **Longest drawn bond:** 83 px at full resolution (rest 32 px); no frame with a bond over 3 spacings.
+- **Fusions and divisions:** 140 to 190 each per 300 pond seconds, about 5 a minute at the default Drift.
+- **Unison:** within bodies of 40 dots or more, the phase order parameter averages about 0.89 (headless, 160 pond seconds; 1 is perfect unison).
 
-| | |
-|---|---|
-| Screen lit at any moment | 30–34% (91% lit at some point) |
-| Fusions / divisions | 10–11 / 5–9 per 4–5 minutes |
-| Dots holding a bond | 98–99% |
-| Longest drawn bond | 83 px (rest 32 px); no frame with a bond over 3 spacings |
-| Dots within 0.3 of a tap | +40 to +90 after 6 seconds |
-| Simulation + geometry per drawn frame | about 1.4 + 0.9 ms |
-
-Headless 30-minute runs on four seeds, with the same equations:
-- **Events:** mostly 8 to 40 fusions and divisions per 5 minutes after the opening minutes.
-- **Oversized bodies:** a body over three lineages' size is present 0.5–7% of the time.
-- **Loose dots:** 7–16% of dots sit outside any body of 14 or more, as drifting fragments drawn small and dim.
+Headless runs of 400 pond seconds, with the same equations: the pond stayed within 103–104% of its size, ten groups arrived, about 190 dots left over the edges, and 1,000 to 2,000 dots crossed the screen's edge each way per pond minute.
 
 Fusions and divisions are only *observed*. A fusion is counted when at least four grown bonds join two earlier bodies of 36 or more dots; a division when a body's dots end up in two groups of 36 or more.
 

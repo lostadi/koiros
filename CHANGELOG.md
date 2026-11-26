@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.1 — Shapes, heat and an open frame
+
+- **Open shapes, no collapse.** In long runs during this release's development, bodies crushed themselves into a few tight balls: gathering added up through a body into a pressure no spacing force could hold. The continuous exclusion principle now senses crowding at each dot's own scale: the pull together fades as packing nears 1.4 times a relaxed lattice and pushes apart beyond it. Bodies stay open lattices (rings, loops, crescents, curled arms and webs) and light about a third of the screen at any moment, against 7% for the collapsed state.
+- **Colour is kind.** A dot's colour sets its bond length, breathing, valence, swimming and mass, replacing 3.0's genes. Each lineage keeps its own colour, which drifts at its own rate, so fused bodies show colour patches and gradients instead of averaging to one hue.
+- **Heat.** A vertex crowded per bond it holds heats and glows red. Hot vertices repel each other, gather less, fray their bonds to each other and bond outward to cool vertices, so crowded clusters unfold.
+- **Mass** varies with colour, bonds and heat, and divides every force.
+- **Hidden dimensions.** Each dot has two hidden coordinates; the screen shows a slowly turning projection, so forces come and go.
+- **Strokes.** Dots move to their own rhythm: in and out, around, and in small circles. Bodies in step move as one, with waves travelling from their cores.
+- **An open frame.** The screen is a window onto a larger pond. Groups of varying size, shape, density, speed and colour slide in from beyond the edges, parts of bodies drift out, and the pond keeps within a few percent of its size.
+- **Smooth colour.** Every dot is drawn in its exact colour, and every bond is a gradient between its two dots. 3.0 shifted each dot's hue with its rhythm and snapped it to 48 steps, so colours flipped on every beat; colour now changes steadily. The beat is a smooth swell instead of a jump between size classes.
+- **Touch.** Dragging moves nearby dots with your finger and can fling them; a tap startles them outward and snaps their rhythms into one bright beat.
+- **More vibrant.** Brighter bonds, dots, glows and auras; the kinds' reds stay vivid.
+- **Lighter drawing.** Dots, glows and bonds take three draw calls instead of a few hundred. Below Android 10, where hardware canvases cannot draw vertex batches, the wallpaper draws on a software canvas.
+
 ## 3.0 — The emergent lattice
 
 - New default model, **Emergent lattice**: the pond reduced to the equations each dot obeys. Dots bond up to their valence, more readily when in step and alike in colour; bonds are springs that breathe with the rhythm and snap when stretched or out of step; rhythm, colour, spin, depth and heading spread along bonds; each dot gathers toward dots in step with it (swarmalator coupling), circles the density it feels, swims, drifts in the hidden Life current, and senses crowding (quorum). Bodies, crystal cores and lacy rims, spiral arms, synchrony, fusion and division emerge; nothing above the dot is scripted. See [How Koiros evolves](docs/DYNAMICS.md).

@@ -260,6 +260,8 @@ public final class KoiRenderer implements Pond {
             touching = false; affection = Companion.pet(affection); attention = 1; engagement = 1;
         } else touching = false;
     }
+    /** The classic forms respond to touch through attention only. */
+    @Override public void stir(double u, double v, double velocityU, double velocityV) { }
     /** A welcome back: bodies gather toward the lower middle with a soft glow. */
     public void greet(double strength) {
         double s = bounded(strength, 0, 1);

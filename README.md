@@ -26,9 +26,9 @@ Created by **Lee Daghlar Ostadi**, building on **Artificial Koi** by
 The name combines *koi* with *kairos*, the idea of the right or opportune
 moment—a name for forms unfolding in their own time.
 
-<p align="center"><img src="docs/images/koiros-lattice.jpg" width="280" alt="An actual Koiros 3.0 frame: glowing lattice bodies of bonded dots with spiral arms, spread over a dark screen"></p>
+<p align="center"><img src="docs/images/koiros-lattice.jpg" width="280" alt="A Koiros 3.1 frame: open, lacy lattices of bonded dots in yellow, pink, magenta and violet gradients, spread over a dark screen, with a group entering at the right edge"></p>
 
-*An offscreen Android render of the Emergent lattice at full phone resolution, one minute after a random start; not a photograph of a phone.*
+*An offscreen Android render of the Emergent lattice at full phone resolution, 150 pond seconds after a random start (run at Drift 0.5 to get there sooner); not a photograph of a phone.*
 
 ## Install and make it yours
 
@@ -51,11 +51,15 @@ The sliders reach **0.02×** for very gradual motion.
 **Emergent lattice** (default):
 
 - **Dots, not drawn shapes:** about 270 dots per lineage, each with a position, rhythm, colour, spin, depth and valence. Bonds form, breathe and snap by the dots' own rules; bodies are just connected groups of bonds. [The equations](docs/DYNAMICS.md).
-- **Bodies that make themselves:** dots that can hold more bonds sort into crystal cores; dots that hold two or three make nets and lacy rims; swirl strongest at the edge winds them into spiral arms.
-- **Fusion and division without a script:** bodies that fall into step attract and knit together, and colour and rhythm average along the new bonds. When their rhythms can no longer stay locked they drift apart again, and quorum sensing loosens any body that grows too large.
+- **Bodies that make themselves:** open lattices that take on rings, loops, crescents, curled arms and webs. Dots that can hold more bonds sort into crystal cores; dots that hold two or three make nets and lacy rims.
+- **No collapse:** a continuous exclusion principle stops any body crushing itself. The pull together fades as packing nears critical, and pushes apart beyond it.
+- **Heat:** a vertex crowded per bond it holds glows red, its most repulsive state. Hot vertices push apart and link outward, so clusters unfold into new shapes and cool as they spread.
+- **Colour is kind:** a dot's colour sets its bond length, breathing, valence, swimming and mass. Colours flow steadily as gradients, every dot is drawn in its exact colour, every bond is a gradient between its dots, and each lineage keeps its own drifting colour, so fused bodies show patches of their lineages.
+- **Fusion and division without a script:** bodies that fall into step attract and knit together. When their rhythms can no longer stay locked they drift apart again, and quorum sensing loosens any body that grows too large.
+- **An open frame:** the screen is a window onto a larger pond. Groups of different sizes, shapes, densities, speeds and colours slide in from beyond the edges, and parts of bodies drift out.
+- **Unison:** dots move to their own rhythm, so a body in step strokes and swells as one, with waves from its core. A slowly turning projection from two hidden dimensions makes forces come and go.
+- **Touch:** drag to move and fling dots; tap and they startle outward in one bright beat.
 - **The whole screen:** bodies spread over all of it, start in a random arrangement every time, and look three-dimensional: near bodies larger and brighter, tilted like galaxies, with home-page parallax.
-- **Colour that flows:** a gradient across each body that drifts smoothly with the palette, and the hidden water carries colour between bodies.
-- **Rules that evolve:** each dot's bond length, breathing and swimming are genes that change with its body's history and surroundings, so shapes and pulses keep shifting.
 
 **Classic forms:**
 

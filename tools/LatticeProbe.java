@@ -115,7 +115,7 @@ public final class LatticeProbe {
 
     private static int near(DotLattice d, double px, double py) {
         int n = 0;
-        for (int i = 0; i < d.count; i++) if (Math.hypot(d.x[i] - px, d.y[i] - py) < .3) n++;
+        for (int i = 0; i < d.count; i++) if (Math.hypot(d.px[i] - px, d.py[i] - py) < .3) n++;
         return n;
     }
 }
