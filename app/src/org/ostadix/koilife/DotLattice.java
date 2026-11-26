@@ -103,6 +103,8 @@ public final class DotLattice {
     final double[] lineageOmega = new double[LINEAGES];
     /** Each lineage's genome wanders around where it began, so lineages never converge. */
     final double[][] lineageGene = new double[4][LINEAGES], lineageBirth = new double[4][LINEAGES];
+    /** Each lineage's spin at birth: remembered spin keeps leaning back to it, so mixing cannot erase rotation. */
+    final double[] lineageSpin = new double[LINEAGES];
     private static final double[] GENE_WANDER = {1.3, .15, .07, .35};
     private static final double[] GENE_LOW = {1.6, .8, .04, .5}, GENE_HIGH = {6.4, 1.35, .3, 1.8};
     double rhythmWander = 15;
@@ -279,6 +281,7 @@ public final class DotLattice {
         double baseSpacing = .92 + .2 * rand(), baseBreath = .09 + .11 * rand(), baseSwim = .8 + .4 * rand();
         double[] birth = {recipeMean + (rand() - .5), baseSpacing, baseBreath, baseSwim};
         for (int k = 0; k < 4; k++) lineageGene[k][lineageIndex] = lineageBirth[k][lineageIndex] = birth[k];
+        lineageSpin[lineageIndex] = baseSpin;
         // An irregular start: a lumpy, stretched, tilted cloud, with part of
         // the group still loose in a trailing stream, so bodies assemble.
         double aspect = 1 + .8 * rand(), tilt = rand() * Math.PI, ct = Math.cos(tilt), st = Math.sin(tilt);
@@ -779,8 +782,8 @@ public final class DotLattice {
             + learn * (geneBreath[i] - memoryBreath[i]) + .1 * noise * (rand() - .5), .04, .3);
         memorySwim[i] = clamp(memorySwim[i] + heredity * (lineageGene[3][l] - memorySwim[i])
             + learn * (geneSwim[i] - memorySwim[i]) + .3 * noise * (rand() - .5), .5, 1.8);
-        // The spin a dot remembers also follows what its body does.
-        nativeSpin[i] += learn * (spin[i] - nativeSpin[i]);
+        // The spin a dot remembers follows what its body does, and its lineage.
+        nativeSpin[i] += learn * (spin[i] - nativeSpin[i]) + heredity * (lineageSpin[l] - nativeSpin[i]);
         if (!evolveValence) return;
         valence[i] = (int) Math.round(clamp(geneValence[i], 2, 6));
         if (degree[i] > valence[i]) {
