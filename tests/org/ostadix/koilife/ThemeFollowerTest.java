@@ -8,6 +8,7 @@ public final class ThemeFollowerTest {
         strongestColourLeads();
         peaksAreApartAndWrapAroundRed();
         themeMovesOnlyWhenColoursMove();
+        seedGlidesThroughTheHuesBetween();
         neonMatchesTheLattice();
         jsonIsTheSystemsOwnFormat();
         System.out.println("ThemeFollowerTest passed: " + checks + " checks");
@@ -39,17 +40,62 @@ public final class ThemeFollowerTest {
         for (int k = 1; k < n; k++) check(Math.abs(ThemeFollower.arc(h[k] - h[0])) >= ThemeFollower.SEPARATION, "Peaks too close");
     }
 
+    private static double[] h(double a, double b, double c) { return new double[] {a, b, c}; }
+
     private static void themeMovesOnlyWhenColoursMove() {
         ThemeFollower f = new ThemeFollower();
-        check(f.due(200, 0), "The first theme was not applied");
-        check(!f.due(240, 1000), "Theme changed again within the interval");
-        check(!f.due(205, ThemeFollower.MIN_INTERVAL_MS + 1), "A small drift changed the theme");
-        check(f.due(230, ThemeFollower.MIN_INTERVAL_MS + 2), "A real change after the interval was not applied");
-        check(f.due(359, 2 * ThemeFollower.MIN_INTERVAL_MS + 10), "A change was not applied");
-        check(!f.due(5, 3 * ThemeFollower.MIN_INTERVAL_MS + 20), "Drift across red counted as a big change");
+        long gap = ThemeFollower.MIN_INTERVAL_MS;
+        double[] out = new double[3];
+        check(f.next(h(200, 300, 60), 0, out) && out[0] == 200 && out[1] == 300, "The first theme was not applied");
+        check(!f.next(h(240, 300, 60), 1000, out), "Theme changed again within the interval");
+        check(!f.next(h(203, 302, 61), gap + 1, out), "A tiny drift changed the theme");
+        check(f.next(h(240, 300, 62), gap + 2, out), "A big change was not taken");
+        near(out[0], 200 + ThemeFollower.MAX_STEP, 1e-9, "A big change was not one small step");
+        near(out[2], 62, 1e-9, "A small change elsewhere was not carried along");
+        check(f.next(h(200, 360, 62), 2 * gap + 3, out), "The second colour alone did not move the theme");
+        near(out[1], 300 + ThemeFollower.MAX_STEP, 1e-9, "The second colour's step was not small");
+        ThemeFollower g = new ThemeFollower();
+        g.next(h(355, 100, 220), 0, out);
+        g.next(h(15, 100, 220), gap, out);
+        near(out[0], 355 + ThemeFollower.MAX_STEP - 360, 1e-9, "Step across red went the long way");
         f.forget();
-        check(f.due(5, 3 * ThemeFollower.MIN_INTERVAL_MS + 21), "Turning on again did not apply at once");
-        check(!f.due(Double.NaN, 10 * ThemeFollower.MIN_INTERVAL_MS), "No colour changed the theme");
+        check(f.next(h(5, 6, 7), 3 * gap, out) && out[0] == 5, "Turning on again did not apply at once");
+        check(!new ThemeFollower().next(h(Double.NaN, 1, 2), 0, out), "No colour changed the theme");
+    }
+
+    private static void seedGlidesThroughTheHuesBetween() {
+        ThemeFollower f = new ThemeFollower();
+        double[] out = new double[3];
+        f.glide(h(100, 0, 0), 1, 0, out);
+        near(out[0], 100, 1e-9, "The glide did not start at the first colour");
+        near(out[1], 220, 1e-9, "A one-colour pond did not lend a second, different colour");
+        near(out[2], 340, 1e-9, "A one-colour pond did not lend a third, different colour");
+        f.glide(h(160, 220, 340), 3, 5000, out);
+        check(out[0] > 100 && out[0] < 104, "A new colour was not eased toward: " + out[0]);
+        double previous = out[0];
+        for (long t = 10000; t <= 900000; t += 5000) {
+            f.glide(h(160, 220, 340), 3, t, out);
+            check(out[0] >= previous - 1e-9 && out[0] <= 160 + 1e-9, "Glide overshot or went back");
+            previous = out[0];
+        }
+        near(out[0], 160, 1, "The glide never arrived");
+        // Peaks that swap order are still followed by the hue nearest them.
+        f.glide(h(340, 160, 220), 3, 905000, out);
+        near(out[1], 220, 1, "A hue jumped to another colour when the order changed");
+        // The theme seen through glide and steps: never more than a small step at once.
+        ThemeFollower t = new ThemeFollower();
+        double[] g = new double[3], w = new double[3], last = null;
+        double largest = 0;
+        for (long now = 0; now < 1800000; now += 5000) {
+            double[] pond = now < 300000 ? h(30, 110, 190) : h(80, 160, 250);
+            t.glide(pond, 3, now, g);
+            if (!t.next(g, now, w)) continue;
+            if (last != null) for (int k = 0; k < 3; k++) largest = Math.max(largest, Math.abs(ThemeFollower.arc(w[k] - last[k])));
+            last = w.clone();
+        }
+        check(largest <= ThemeFollower.MAX_STEP + 1e-9, "The theme leapt " + largest + " degrees");
+        near(last[0], 80, ThemeFollower.MIN_STEP + 1, "The theme did not reach the new colour");
+        near(last[2], 250, ThemeFollower.MIN_STEP + 1, "The third colour did not follow");
     }
 
     private static void neonMatchesTheLattice() {

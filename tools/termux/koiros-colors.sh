@@ -7,7 +7,8 @@
 # Koiros runs this through Termux's RUN_COMMAND (needs allow-external-apps = true
 # in ~/.termux/termux.properties). The pond's strongest colour tints the
 # background, text and cursor; the sixteen terminal colours keep their usual
-# meanings (red stays red) in the lattice's own neon.
+# meanings (red stays red) in the lattice's own neon, and the second and third
+# colours tint the greys and, with root, the system's secondary and tertiary roles.
 set -eu
 dir="$HOME/.termux"
 colors="$dir/colors.properties"
@@ -16,7 +17,22 @@ mkdir -p "$dir"
 
 reload() { command -v termux-reload-settings >/dev/null 2>&1 && termux-reload-settings || true; }
 
+# With root, the system's secondary and tertiary colours take the pond's second
+# and third colours, so the theme is never one hue (Material You alone grows
+# everything from the seed). The overlay is Koiros's own and can be turned off.
+overlay=com.android.shell:koiros_theme
+system_colours() {
+    command -v su >/dev/null 2>&1 || return 0
+    xml="$dir/koiros-theme.xml"
+    python3 "$dir/koiros-palette.py" "$1" "$2" > "$xml" || return 0
+    su -c "cp '$xml' /data/system/koiros-theme.xml && chown system:system /data/system/koiros-theme.xml \
+        && chmod 600 /data/system/koiros-theme.xml; restorecon /data/system/koiros-theme.xml; \
+        cmd overlay fabricate --target android --name koiros_theme --file /data/system/koiros-theme.xml \
+        && cmd overlay enable $overlay; rm -f /data/system/koiros-theme.xml" >/dev/null 2>&1 || true
+}
+
 if [ "${1:-}" = "--restore" ]; then
+    command -v su >/dev/null 2>&1 && su -c "cmd overlay disable $overlay" >/dev/null 2>&1 || true
     if [ -f "$kept" ]; then mv "$kept" "$colors"; else rm -f "$colors"; fi
     reload
     exit 0
@@ -58,8 +74,8 @@ BEGIN {
     print "background=" mixed(seed, 3, 7, 14, .07)
     print "foreground=" mixed(seed, 240, 244, 250, .16)
     print "cursor=#" seed
-    print "color0=" mixed(seed, 22, 26, 34, .10)
-    print "color8=" mixed(seed, 92, 98, 112, .22)
+    print "color0=" mixed(third, 22, 26, 34, .14)
+    print "color8=" mixed(second, 92, 98, 112, .30)
     print "color7=" mixed(second, 205, 210, 220, .12)
     print "color15=" mixed(third, 250, 252, 255, .08)
     # red, green, yellow, blue, magenta, cyan
@@ -71,3 +87,5 @@ BEGIN {
 }' > "$tmp"
 mv "$tmp" "$colors"
 reload
+[ $# -ge 3 ] && system_colours "$2" "$3"
+exit 0

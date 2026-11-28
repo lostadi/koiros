@@ -182,15 +182,15 @@ public final class PondWallpaperService extends WallpaperService {
             follower.reset();
             renderer.showColors(follower);
             int found = follower.peaks(themeHues);
-            if (found == 0 || !follower.due(themeHues[0], now)) return;
-            final int seed = ThemeFollower.neon(themeHues[0]);
-            final int second = ThemeFollower.neon(found > 1 ? themeHues[1] : themeHues[0] + 120);
-            final int third = ThemeFollower.neon(found > 2 ? themeHues[2] : themeHues[0] - 120);
+            follower.glide(themeHues, found, now, themeGlide);
+            if (!follower.next(themeGlide, now, themeGlide)) return;
+            final int seed = ThemeFollower.neon(themeGlide[0]);
+            final int second = ThemeFollower.neon(themeGlide[1]), third = ThemeFollower.neon(themeGlide[2]);
             dayHandler.post(() -> ThemeWriter.apply(PondWallpaperService.this, seed, second, third));
         }
         private static final long THEME_CHECK_MS = 5000;
         private final ThemeFollower follower = new ThemeFollower();
-        private final double[] themeHues = new double[3];
+        private final double[] themeHues = new double[3], themeGlide = new double[3];
         private long themeCheckedAt;
         private boolean themeFollow = true;
         private long keyguardCheckedAt;

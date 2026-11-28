@@ -13,21 +13,21 @@ package org.ostadix.koilife;
  * the terminal). Each peak's hue is the weighted circular mean of the hues
  * near it, so the seed moves smoothly as the pond's colours drift.
  *
- * <p>Every theme change restyles every open app, so a new theme is due only
- * when the seed has moved at least {@link #MIN_STEP} degrees and at least
- * {@link #MIN_INTERVAL_MS} has passed since the last one. No Android types: the
+ * <p>Every theme change restyles every open app, so the seed glides toward
+ * the pond's colour and the theme follows in small, infrequent steps. No Android types: the
  * same code runs in the tests.
  */
 final class ThemeFollower {
     static final int BUCKETS = 36;
-    static final double SEPARATION = 50, MIN_STEP = 14;
-    static final long MIN_INTERVAL_MS = 45000;
+    static final double SEPARATION = 50, MIN_STEP = 5, MAX_STEP = 9, GLIDE_SECONDS = 120;
+    static final long MIN_INTERVAL_MS = 20000;
     private static final double SPREAD = 25;
 
     private final double[] weight = new double[BUCKETS], sin = new double[BUCKETS], cos = new double[BUCKETS];
     private double total;
-    private double lastHue = Double.NaN;
-    private long lastAt;
+    private final double[] last = {Double.NaN, Double.NaN, Double.NaN};
+    private final double[] glided = {Double.NaN, Double.NaN, Double.NaN};
+    private long lastAt, glideAt;
 
     void reset() {
         java.util.Arrays.fill(weight, 0); java.util.Arrays.fill(sin, 0); java.util.Arrays.fill(cos, 0);
@@ -74,17 +74,66 @@ final class ThemeFollower {
         return found;
     }
 
-    /** True when the theme should move to this seed hue now; remembers it if so. */
-    boolean due(double hue, long nowMs) {
-        if (Double.isNaN(hue)) return false;
-        boolean first = Double.isNaN(lastHue);
-        if (!first && (nowMs - lastAt < MIN_INTERVAL_MS || Math.abs(arc(hue - lastHue)) < MIN_STEP)) return false;
-        lastHue = hue; lastAt = nowMs;
+    /**
+     * Three hues glide toward the pond's three strongest colours rather than
+     * jumping to them: each follows the nearest peak (within 90 degrees) with a
+     * two-minute time constant, so a new colour arrives as a slow gradient
+     * through the hues between. A pond showing fewer than three colours lends
+     * its missing ones from a triad around the strongest, so the theme is never
+     * a single hue. Writes the gliding hues to out.
+     */
+    void glide(double[] peaks, int found, long nowMs, double[] out) {
+        if (Double.isNaN(glided[0])) {
+            if (found == 0) { System.arraycopy(glided, 0, out, 0, 3); return; }
+            for (int k = 0; k < 3; k++) glided[k] = wrap(k < found ? peaks[k] : peaks[0] + (k == 1 ? 120 : -120));
+            glideAt = nowMs;
+        } else {
+            double ease = -Math.expm1(-Math.max(0, (nowMs - glideAt) / 1000.0) / GLIDE_SECONDS);
+            glideAt = nowMs;
+            boolean[] taken = new boolean[3];
+            for (int k = 0; k < 3; k++) {
+                int nearest = -1; double distance = 90;
+                for (int p = 0; p < found; p++) {
+                    double d = Math.abs(arc(peaks[p] - glided[k]));
+                    if (!taken[p] && d <= distance) { nearest = p; distance = d; }
+                }
+                if (nearest < 0) continue;
+                taken[nearest] = true;
+                glided[k] = wrap(glided[k] + arc(peaks[nearest] - glided[k]) * ease);
+            }
+        }
+        System.arraycopy(glided, 0, out, 0, 3);
+    }
+
+    /**
+     * The next theme hues: true, with out set, when one is due. Themes move in
+     * small steps: each hue at most {@link #MAX_STEP} degrees, only once some
+     * hue has moved {@link #MIN_STEP}, and at most every {@link #MIN_INTERVAL_MS}.
+     * Each change is slight, and colours shift through every hue between.
+     */
+    boolean next(double[] hues, long nowMs, double[] out) {
+        if (Double.isNaN(hues[0])) return false;
+        if (Double.isNaN(last[0])) {
+            for (int k = 0; k < 3; k++) last[k] = wrap(hues[k]);
+        } else {
+            if (nowMs - lastAt < MIN_INTERVAL_MS) return false;
+            double largest = 0;
+            for (int k = 0; k < 3; k++) largest = Math.max(largest, Math.abs(arc(hues[k] - last[k])));
+            if (largest < MIN_STEP) return false;
+            for (int k = 0; k < 3; k++) {
+                last[k] = wrap(last[k] + Math.max(-MAX_STEP, Math.min(MAX_STEP, arc(hues[k] - last[k]))));
+            }
+        }
+        lastAt = nowMs;
+        System.arraycopy(last, 0, out, 0, 3);
         return true;
     }
 
     /** Forget the last theme, so the next offer applies at once. */
-    void forget() { lastHue = Double.NaN; }
+    void forget() {
+        java.util.Arrays.fill(last, Double.NaN);
+        java.util.Arrays.fill(glided, Double.NaN);
+    }
 
     /** The lattice's own neon for a hue: full value, saturation eased only near red. */
     static int neon(double hue) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.4 — Many colours, gliding
+
+- **Never one hue.** Material You grows a whole theme from one seed, so on its own every colour is a shade of it. The theme now carries the pond's three strongest colours: the first seeds Material You, and, with root, the second and third become the system's secondary and tertiary colours. Each gets a full tonal palette (the same hue at every lightness, as vivid as the screen allows), written as Koiros's own overlay (`tools/termux/koiros-palette.py`). A pond showing fewer colours lends the rest from a triad.
+- **Gradual.** Each of the three hues glides toward the colour it follows with a two-minute time constant, and the theme moves in steps of at most 9 degrees, at most every 20 seconds, so colours shift through every hue between instead of jumping.
+- Termux's greys take the second and third colours too.
+
 ## 3.3 — Your phone takes the pond's colours
 
 - **Theme follows the wallpaper.** Koiros reads which colours the pond is showing (each dot weighted by how brightly it is drawn; for the classic model, each creature by its size) and sets Android's Material You seed to the strongest one, in the lattice's own neon with the Vibrant style. The system bars, Settings, the keyboard and every app that uses Material You colours follow. The theme moves only when the main colour has shifted at least 14 degrees, and at most every 45 seconds, because each change restyles every open app. Previews never touch it.
