@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.1 — One gradient on the keyboard
+
+- **The keyboard is one shifting gradient.** With root, Gboard wears an image theme Koiros draws: the pond's main colour flowing into its neighbours across the keys (70 degrees of hue), dimmer toward the bottom so labels stay clear. As the pond's colour glides, the gradient is redrawn around the new hue. Gboard reads its theme when it starts, so it is restarted for a new gradient only while the keyboard is hidden, at most once a minute. Turning **Theme follows the wallpaper** off returns Gboard to its own theme. (`tools/termux/koiros-keyboard.py`; the style sheet in `tools/termux/gboard/` is the one Gboard writes for an image theme.)
+
 ## 3.4 — Many colours, gliding
 
 - **Never one hue.** Material You grows a whole theme from one seed, so on its own every colour is a shade of it. The theme now carries the pond's three strongest colours: the first seeds Material You, and, with root, the second and third become the system's secondary and tertiary colours. Each gets a full tonal palette (the same hue at every lightness, as vivid as the screen allows), written as Koiros's own overlay (`tools/termux/koiros-palette.py`). A pond showing fewer colours lends the rest from a triad.

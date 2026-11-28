@@ -31,8 +31,42 @@ system_colours() {
         && cmd overlay enable $overlay; rm -f /data/system/koiros-theme.xml" >/dev/null 2>&1 || true
 }
 
+# With root, Gboard wears one gradient of the pond's main colour (an image
+# theme Koiros redraws). Gboard reads its theme when it starts, so it is
+# restarted to pick up a new gradient, only while the keyboard is hidden and at
+# most once a minute. Two file names alternate so Gboard never shows a cached one.
+gboard=/data/data/com.google.android.inputmethod.latin
+gprefs=/data/user_de/0/com.google.android.inputmethod.latin/shared_prefs/com.google.android.inputmethod.latin_preferences.xml
+stamp="$dir/.koiros-keyboard"
+keyboard() {
+    command -v su >/dev/null 2>&1 || return 0
+    now=$(date +%s); last=$(cat "$stamp" 2>/dev/null || echo 0)
+    [ $((now - last)) -ge 60 ] || return 0
+    su -c "dumpsys input_method | grep -q 'mInputShown=true'" 2>/dev/null && return 0
+    slot=$(( (now / 60) % 2 ))
+    name="user_theme_package_00999999999999${slot}_00.zip"
+    python3 "$dir/koiros-keyboard.py" "$1" "$dir/koiros-keyboard.zip" || return 0
+    su -c "owner=\$(stat -c %U $gboard/files) && label=\$(ls -Zd $gboard/files | awk '{print \$1}') \
+        && cp '$dir/koiros-keyboard.zip' $gboard/files/$name && chown \$owner:\$owner $gboard/files/$name \
+        && chmod 600 $gboard/files/$name && chcon \$label $gboard/files/$name \
+        && rm -f $gboard/files/user_theme_package_00999999999999$((1 - slot))_00.zip \
+        && am force-stop com.google.android.inputmethod.latin \
+        && if grep -q 'name=\"additional_keyboard_theme\"' $gprefs; then \
+             sed -i 's#<string name=\"additional_keyboard_theme\">[^<]*</string>#<string name=\"additional_keyboard_theme\">files:$name</string>#' $gprefs; \
+           else sed -i 's#</map>#    <string name=\"additional_keyboard_theme\">files:$name</string>\n</map>#' $gprefs; fi" >/dev/null 2>&1 \
+        && echo "$now" > "$stamp"
+}
+keyboard_restore() {
+    command -v su >/dev/null 2>&1 || return 0
+    su -c "am force-stop com.google.android.inputmethod.latin; \
+        sed -i '/name=\"additional_keyboard_theme\">files:user_theme_package_00999999999999/d' $gprefs; \
+        rm -f $gboard/files/user_theme_package_00999999999999?_00.zip" >/dev/null 2>&1 || true
+    rm -f "$stamp"
+}
+
 if [ "${1:-}" = "--restore" ]; then
     command -v su >/dev/null 2>&1 && su -c "cmd overlay disable $overlay" >/dev/null 2>&1 || true
+    keyboard_restore
     if [ -f "$kept" ]; then mv "$kept" "$colors"; else rm -f "$colors"; fi
     reload
     exit 0
@@ -88,4 +122,5 @@ BEGIN {
 mv "$tmp" "$colors"
 reload
 [ $# -ge 3 ] && system_colours "$2" "$3"
+keyboard "$1"
 exit 0

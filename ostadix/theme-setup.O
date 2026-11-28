@@ -51,11 +51,14 @@ if not re.search(r"^\s*allow-external-apps\s*=\s*true", text, re.M):
     props.write_text(text + "\n\n# Koiros: lets apps holding Termux's RUN_COMMAND permission (granted only to Koiros) run a command.\nallow-external-apps = true\n")
     done.append("allowed RUN_COMMAND in termux.properties")
 
-for name in ("koiros-colors.sh", "koiros-palette.py"):
+for name in ("koiros-colors.sh", "koiros-palette.py", "koiros-keyboard.py"):
     script = home / ".termux" / name
     shutil.copy2(root / "tools/termux" / name, script)
     script.chmod(0o700)
     done.append("installed " + str(script))
+# Gboard's own image-theme style sheet, which the keyboard gradient reuses.
+shutil.copytree(root / "tools/termux/gboard", home / ".termux/gboard", dirs_exist_ok=True)
+done.append("installed the keyboard theme template")
 subprocess.run(["termux-reload-settings"], capture_output=True)
 
 code, theme = su("settings get secure theme_customization_overlay_packages")
