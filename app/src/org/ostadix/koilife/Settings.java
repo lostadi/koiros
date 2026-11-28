@@ -37,6 +37,8 @@ final class Settings {
     Pond createPond(long seed) { return lattice() ? new LatticeRenderer(seed) : new KoiRenderer(seed); }
     /** True when the pond's model differs from the saved choice. */
     boolean modelChanged(Pond pond) { return (pond instanceof LatticeRenderer) != lattice(); }
+    /** New in 3.2: dots collide with the apps on the home screen (needs the layout reader enabled). */
+    boolean homeCollisions() { return prefs.getBoolean("home_collisions", true); }
     boolean touchRipples() { return prefs.getBoolean("touch_ripples", true); }
     boolean autoReseed() { return prefs.getBoolean("auto_reseed", true); }
     void newSeed() { prefs.edit().putLong("seed", new SecureRandom().nextLong()).apply(); }

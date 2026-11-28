@@ -17,6 +17,8 @@ interface Pond {
     void setPageOffset(double xOffset, double xOffsetStep, double xPixelOffset, double surfaceWidth);
     /** A normalized screen tap for water ripples. */
     void touch(double u, double v);
+    /** The home screen's apps as solid shapes, or null. Forms that do not collide ignore it. */
+    default void setHome(HomeLayout layout, double shiftPx) { }
     /** A finger moving over the wallpaper: screen fractions, and screen fractions per second. */
     void stir(double u, double v, double velocityU, double velocityV);
     /** A companion touch in normalized screen coordinates; kind is one of TOUCH_*. */

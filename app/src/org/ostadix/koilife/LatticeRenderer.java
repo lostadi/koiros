@@ -144,6 +144,13 @@ public final class LatticeRenderer implements Pond {
     private double simulationCostMs, geometryCostMs, canvasCostMs;
     private int lastLinkCount, lastPointCount;
     private volatile double pageCentered;
+    // The home screen's apps as solid shapes, and how hard dots rebound from them.
+    private static final double HOME_RESTITUTION = .55;
+    private final HomeCollider home = new HomeCollider();
+    private final double[] contact = new double[3];
+    private volatile HomeLayout homeLayout;
+    private volatile double homeShift;
+    private int homeContacts;
 
     public LatticeRenderer(long seed) {
         world = new LifeField(WORLD_COLUMNS, WORLD_ROWS, seed);
@@ -208,6 +215,10 @@ public final class LatticeRenderer implements Pond {
         pageCentered = PageDrift.centeredOffset(xOffset, xOffsetStep, xPixelOffset, surfaceWidth);
     }
     @Override public void touch(double u, double v) { if (ripplesEnabled) ripples.touch(u, v); }
+    /** The home screen's shapes to collide with, or null; paged shapes moved by shiftPx. */
+    @Override public void setHome(HomeLayout layout, double shiftPx) { homeLayout = layout; homeShift = shiftPx; }
+    /** Dots pushed out of an app this frame. */
+    public int getHomeContacts() { return homeContacts; }
     /** New pond: a new Life world and a fresh random arrangement of dots. */
     @Override public void reseed(long seed) {
         this.seed = seed;
@@ -407,6 +418,10 @@ public final class LatticeRenderer implements Pond {
         // Only what is in the frame is drawn: the pond goes on beyond it. Dots up to
         // a bond's length outside still count, so bonds run off the edge to real dots.
         double nearW = unitsW * .5 + .25, nearH = unitsH * .5 + .25, pad = maxBond + 4 * stroke;
+        // Contact begins a little before a dot's centre reaches an app's edge.
+        home.prepare(homeLayout, homeShift, width, height, 2.5 * stroke);
+        boolean collideHome = home.active();
+        homeContacts = 0;
         Arrays.fill(layerCounts, 0);
         for (int i = 0; i < n; i++) {
             visibleDot[i] = false;
@@ -449,6 +464,18 @@ public final class LatticeRenderer implements Pond {
             double px = (u * ca - v2 * sa) * scale, py = (u * sa + v2 * ca) * scale;
             screenX[i] = (float) (width * .5 + (anchorX[i] + px) * extent + PageDrift.pixelShift(pageCentered, depth, extent));
             screenY[i] = (float) (height * .5 + (anchorY[i] + py) * extent);
+            // Apps on the home screen are solid. A dot drawn inside one is moved
+            // out to its surface, the move is carried back into the pond (scaled
+            // by how large this dot is drawn) and its motion rebounds.
+            if (collideHome && home.collide(screenX[i], screenY[i], contact)) {
+                double push = contact[2], mx = push * contact[0], my = push * contact[1];
+                screenX[i] += (float) mx; screenY[i] += (float) my;
+                double back = 1 / (extent * Math.max(.3, scale));
+                dots.nudge(i, mx * back, my * back);
+                previousX[i] += mx * back; previousY[i] += my * back;
+                dots.bounce(i, contact[0], contact[1], HOME_RESTITUTION);
+                homeContacts++;
+            }
             if (screenX[i] < -pad || screenX[i] > width + pad || screenY[i] < -pad || screenY[i] > height + pad) continue;
             visibleDot[i] = true;
             // Debris far from any body recedes: smaller and dimmer.

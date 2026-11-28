@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.ostadix.koilife" android:versionCode="12" android:versionName="3.1">
+    package="org.ostadix.koilife" android:versionCode="13" android:versionName="3.2">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Know my day: which apps were used, read on the phone only. Koiros has no
@@ -23,6 +23,14 @@
             android:permission="android.permission.BIND_WALLPAPER" android:exported="true">
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>
             <meta-data android:name="android.service.wallpaper" android:resource="@xml/wallpaper" />
+        </service>
+        <!-- Optional, off until the person turns it on: reads where the launcher's apps
+             sit so the dots can collide with them. It receives the launcher's window
+             only, keeps bounds alone, and Koiros has no internet permission. -->
+        <service android:name=".HomeLayoutService" android:label="Koiros app collisions"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/home_layout_service" />
         </service>
     </application>
 </manifest>

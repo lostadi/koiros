@@ -1,6 +1,6 @@
 # Privacy
 
-Last updated: 25 November 2026.
+Last updated: 28 November 2026.
 
 Koiros runs its simulations and rendering on your Android device. It does not
 request Internet access and includes no advertising, analytics, account
@@ -37,13 +37,29 @@ not read notifications, messages, screen contents, or anything inside other
 apps, and it keeps no record of usage times. Turn the switch off or revoke
 usage access in Android's settings at any time.
 
+## Collide with my apps (optional accessibility reader)
+
+Android does not tell a live wallpaper where the launcher draws its icons. If
+you turn on **Koiros app collisions** in Android's Accessibility settings,
+Koiros reads your launcher's window, and only that window, to find where its
+apps, folders, widgets, dock and search bar sit. Android delivers it nothing
+from any other app. From each item it keeps the bounds on screen, whether it
+is an icon, the length of its name (to size the label shape) and whether it
+scrolls with the home pages. Names and all other content are discarded at once.
+The shapes stay in memory only, are never written to storage, and are cleared
+when you turn the reader off. Koiros reads the launcher at most four times a
+second, and only after the launcher reports a change.
+
 ## Permissions and diagnostics
 
 - `SET_WALLPAPER` opens Android's wallpaper setup flow. The wallpaper service is
   protected by Android's `BIND_WALLPAPER` permission.
 - `PACKAGE_USAGE_STATS` is used only for Know my day, and only after you grant
   usage access.
-- `QUERY_ALL_PACKAGES` lets Koiros look up the icons of apps you used.
+- `QUERY_ALL_PACKAGES` lets Koiros look up the icons of apps you used and
+  which app is your launcher.
+- The **Koiros app collisions** accessibility service is bound by Android only
+  after you turn it on, and is protected by `BIND_ACCESSIBILITY_SERVICE`.
 
 Koiros does not request access to your files, contacts, calendar, microphone,
 camera, location, notifications, or network.

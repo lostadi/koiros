@@ -12,7 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "org.ostadix.koilife"
-MODELS = ("Companion", "CoupledChaos", "DotLattice", "FrameBudget", "KoiForms", "LifeField", "PageDrift",
+MODELS = ("Companion", "CoupledChaos", "DotLattice", "FrameBudget", "HomeCollider", "HomeLayout", "KoiForms", "LifeField", "PageDrift",
           "PondDynamics", "TouchRipples", "WorldTint")
 
 

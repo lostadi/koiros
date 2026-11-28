@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.app.WallpaperManager;
+import android.app.KeyguardManager;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.graphics.Canvas;
@@ -13,6 +14,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.service.wallpaper.WallpaperService;
 import android.util.Log;
 import android.view.Choreographer;
@@ -78,6 +80,7 @@ public final class PondWallpaperService extends WallpaperService {
             seed = settings.seed();
             renderer = settings.createPond(seed);
             settings.configure(renderer);
+            homeCollisions = settings.homeCollisions();
             settings.prefs.registerOnSharedPreferenceChangeListener(this);
             // Companion memory lives apart from the settings, so remembering
             // never triggers a reconfiguration.
@@ -147,10 +150,30 @@ public final class PondWallpaperService extends WallpaperService {
             choreographer.removeFrameCallback(this);
             scheduled = false;
         }
+        /**
+         * Hands the home screen's shapes to the pond. On the lock screen there are
+         * no apps to meet, so none are passed; the lock state is asked at most once a second.
+         */
+        private void passHome(int width) {
+            HomeLayout layout = homeCollisions ? HomeLayout.current : null;
+            if (layout != null) {
+                long now = SystemClock.uptimeMillis();
+                if (now - keyguardCheckedAt > 1000) {
+                    keyguardCheckedAt = now;
+                    KeyguardManager keyguard = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+                    locked = keyguard != null && keyguard.isKeyguardLocked();
+                }
+                if (locked) layout = null;
+            }
+            renderer.setHome(layout, layout == null ? 0 : layout.pageShift(HomeLayout.liveOffset, HomeLayout.liveStep, width));
+        }
+        private long keyguardCheckedAt;
+        private boolean locked, homeCollisions = true;
         @Override public void onOffsetsChanged(float xOffset, float yOffset,
                 float xOffsetStep, float yOffsetStep, int xPixelOffset, int yPixelOffset) {
             if (renderer == null) return;
             if (visible) markInteraction();
+            HomeLayout.liveOffset = xOffset; HomeLayout.liveStep = xOffsetStep;
             renderer.setPageOffset(xOffset, xOffsetStep, xPixelOffset,
                 getSurfaceHolder().getSurfaceFrame().width());
         }
@@ -238,6 +261,7 @@ public final class PondWallpaperService extends WallpaperService {
                 seed = settings.seed(); renderer.reseed(seed); resetTiming();
             }
             settings.configure(renderer);
+            homeCollisions = settings.homeCollisions();
             schedule();
         }
         @Override public void onTouchEvent(MotionEvent event) {
@@ -411,6 +435,7 @@ public final class PondWallpaperService extends WallpaperService {
                     hardware = canvas.isHardwareAccelerated();
                     // A sleepy pond on a low battery also draws less.
                     renderer.setPointBudget(sleepy ? Math.min(8000, budget.getPointCount()) : budget.getPointCount());
+                    passHome(canvas.getWidth());
                     renderer.render(canvas, dt);
                     frames++; drawn = true;
                 }

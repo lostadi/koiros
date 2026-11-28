@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2 — Dots meet your apps
+
+- **Collisions with the home screen.** With **Collide with my apps** on, the dots treat the icons, folders, widgets, dock and search bar on your home screen as solid. A dot that reaches one is moved back to its surface and rebounds, and a swimmer heading into it turns away, so bodies flow and break around your apps. Icons are round, their names are pills below them, and widgets keep their rounded shapes; shapes follow the home pages as you scroll, and collisions pause on the lock screen.
+- Android does not tell a wallpaper where the launcher draws its apps, so this needs an optional reader, **Koiros app collisions**, turned on in Accessibility settings. It reads the launcher's window only, at most four times a second and only after a change, keeps nothing but shapes and positions, and Koiros still has no internet permission. See [Privacy](docs/PRIVACY.md).
+- **Install from the repository.** The signed APK is now also committed under `apk/`, alongside the GitHub release.
+
 ## 3.1 — Shapes, heat and an open frame
 
 - **Open shapes, no collapse.** In long runs during this release's development, bodies crushed themselves into a few tight balls: gathering added up through a body into a pressure no spacing force could hold. The continuous exclusion principle now senses crowding at each dot's own scale: the pull together fades as packing nears 1.4 times a relaxed lattice and pushes apart beyond it. Bodies stay open lattices (rings, loops, crescents, curled arms and webs) and light about a third of the screen at any moment, against 7% for the collapsed state.

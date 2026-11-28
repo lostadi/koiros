@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="wallpaper_description">Living forms at different depths, shaped by evolving Game of Life frequency fields.</string>
+    <string name="home_layout_summary">Lets Koiros\'s dots collide with the apps on your home screen.</string>
+    <string name="home_layout_description">Koiros reads where your home screen\'s apps, folders and widgets sit, so the wallpaper\'s dots can bounce off them. It reads your launcher\'s window only, keeps only the shapes and positions, and discards names and all other content at once. Nothing is stored or sent: Koiros has no internet access.</string>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#7ED8CD</item>

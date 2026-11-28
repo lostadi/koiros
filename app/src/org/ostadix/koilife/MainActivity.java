@@ -220,6 +220,48 @@ public final class MainActivity extends Activity {
         merging.setOnCheckedChangeListener((button, checked) ->
             settings.prefs.edit().putBoolean("merging", checked).apply());
         controls.addView(merging, new LinearLayout.LayoutParams(-1, dp(48)));
+        Switch apps = new Switch(this);
+        apps.setText("Collide with my apps");
+        apps.setTextColor(TEXT);
+        apps.setChecked(settings.homeCollisions() && HomeLayoutService.isEnabled(this));
+        TextView appsNote = text("", 12, MUTED);
+        apps.setOnCheckedChangeListener((button, checked) -> {
+            if (refreshingHome) return;
+            settings.prefs.edit().putBoolean("home_collisions", checked).apply();
+            if (checked && !HomeLayoutService.isEnabled(this)) openAccessibility();
+            appsNote.setText(homeNote(checked));
+        });
+        controls.addView(apps, new LinearLayout.LayoutParams(-1, dp(48)));
+        appsNote.setText(homeNote(apps.isChecked()));
+        appsNote.setOnClickListener(v -> openAccessibility());
+        controls.addView(appsNote);
+        homeSwitch = apps; homeNoteView = appsNote;
+    }
+    private Switch homeSwitch;
+    private TextView homeNoteView;
+    private boolean refreshingHome;
+    /** Coming back from Accessibility settings: show whether the reader is on now. */
+    private void refreshHomeSwitch() {
+        if (homeSwitch != null) {
+            boolean on = settings.homeCollisions() && HomeLayoutService.isEnabled(this);
+            refreshingHome = true;
+            homeSwitch.setChecked(on);
+            refreshingHome = false;
+            homeNoteView.setText(homeNote(on));
+        }
+    }
+    private String homeNote(boolean wanted) {
+        if (!HomeLayoutService.isEnabled(this)) {
+            return "Dots bounce off the icons, folders and widgets on your home screen. Android does not tell a wallpaper "
+                + "where they are, so this needs \u201cKoiros app collisions\u201d turned on in Accessibility settings. "
+                + "Tap to open them. It reads your launcher only and keeps only shapes; Koiros has no internet access.";
+        }
+        return wanted ? "On: dots bounce off your apps. Reads your launcher only and keeps only shapes."
+            : "Off. The layout reader is still allowed; turn it off in Accessibility settings if you like.";
+    }
+    private void openAccessibility() {
+        try { startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
+        catch (android.content.ActivityNotFoundException ignored) { }
     }
     private void addCompanionControls(LinearLayout controls) {
         TextView heading = text("COMPANION", 11, MUTED);
@@ -296,7 +338,7 @@ public final class MainActivity extends Activity {
         TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); return t;
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
-    @Override protected void onResume() { super.onResume(); if (preview != null) preview.start(); }
+    @Override protected void onResume() { super.onResume(); if (preview != null) preview.start(); refreshHomeSwitch(); }
     @Override protected void onPause() { if (preview != null) preview.stop(); super.onPause(); }
     @Override protected void onDestroy() { if (preview != null) preview.dispose(); super.onDestroy(); }
 

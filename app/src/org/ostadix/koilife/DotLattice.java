@@ -1090,6 +1090,29 @@ public final class DotLattice {
         double ex = (clamp(vxScreen, -maxSpeed, maxSpeed) - currentX) * k, ey = (clamp(vyScreen, -maxSpeed, maxSpeed) - currentY) * k;
         vx[i] += ex * cosA; vz1[i] += ex * sinA; vy[i] += ey * cosB; vz2[i] += ey * sinB;
     }
+    /** Dot i's on-screen velocity, in units per pond second. */
+    void screenVelocity(int i, double[] out) {
+        out[0] = vx[i] * cosA + vz1[i] * sinA; out[1] = vy[i] * cosB + vz2[i] * sinB;
+    }
+    /**
+     * Dot i has struck a solid surface on the screen whose outward normal is
+     * (nx, ny): the part of its on-screen velocity going into the surface is
+     * reflected, keeping the given fraction, and a swimmer heading into it turns
+     * away as if mirrored off the surface. The hidden dimensions are untouched.
+     */
+    void bounce(int i, double nx, double ny, double restitution) {
+        double length = Math.sqrt(nx * nx + ny * ny);
+        if (!(length > 1e-9)) return;
+        nx /= length; ny /= length;
+        double screenX = vx[i] * cosA + vz1[i] * sinA, screenY = vy[i] * cosB + vz2[i] * sinB;
+        double into = screenX * nx + screenY * ny;
+        if (into < 0) {
+            double j = -(1 + clamp(restitution, 0, 1)) * into, ex = j * nx, ey = j * ny;
+            vx[i] += ex * cosA; vz1[i] += ex * sinA; vy[i] += ey * cosB; vz2[i] += ey * sinB;
+        }
+        double outward = Math.atan2(ny, nx);
+        if (Math.cos(heading[i] - outward) < 0) heading[i] = 2 * (outward + Math.PI / 2) - heading[i];
+    }
 
     /** How far a hidden coordinate sits outside the open room. */
     private static double outside(double v, double extent) {
