@@ -3,6 +3,7 @@
 ## 3.4.1 — One gradient on the keyboard
 
 - **The keyboard is one shifting gradient.** With root, Gboard wears an image theme Koiros draws: the pond's main colour flowing into its neighbours across the keys (70 degrees of hue), dimmer toward the bottom so labels stay clear. As the pond's colour glides, the gradient is redrawn around the new hue. Gboard reads its theme when it starts, so it is restarted for a new gradient only while the keyboard is hidden, at most once a minute. Turning **Theme follows the wallpaper** off returns Gboard to its own theme. (`tools/termux/koiros-keyboard.py`; the style sheet in `tools/termux/gboard/` is the one Gboard writes for an image theme.)
+- **Easy on the battery.** Every theme change makes each open app restyle itself, which costs far more than the wallpaper's own work, so changes are rarer: at most one a minute, only while the wallpaper is showing, and none in Battery Saver or on a low, unplugged battery. Each change is a step of 8 to 14 degrees, and colours glide with a three-minute time constant, so it stays gradual. The keyboard gradient is redrawn at most every five minutes, and only after the colour has moved 20 degrees. One update costs about 1.5 s of CPU in Koiros's scripts.
 
 ## 3.4 — Many colours, gliding
 

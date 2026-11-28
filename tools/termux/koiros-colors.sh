@@ -40,10 +40,23 @@ gprefs=/data/user_de/0/com.google.android.inputmethod.latin/shared_prefs/com.goo
 stamp="$dir/.koiros-keyboard"
 keyboard() {
     command -v su >/dev/null 2>&1 || return 0
-    now=$(date +%s); last=$(cat "$stamp" 2>/dev/null || echo 0)
-    [ $((now - last)) -ge 60 ] || return 0
+    # Redrawing restarts Gboard, so only every five minutes, and only once the
+    # colour has moved at least 20 degrees since the gradient last drawn.
+    now=$(date +%s); set -- "$1" $(cat "$stamp" 2>/dev/null || echo "0 - 1")
+    [ $((now - $2)) -ge 300 ] || return 0
+    [ "$3" = "-" ] || awk -v a="$1" -v b="$3" '
+        function hue(s,   r, g, b, mx, mn, d, h) {
+            r = index("0123456789abcdef", tolower(substr(s, 1, 1))) * 16 - 16 + index("0123456789abcdef", tolower(substr(s, 2, 1))) - 1
+            g = index("0123456789abcdef", tolower(substr(s, 3, 1))) * 16 - 16 + index("0123456789abcdef", tolower(substr(s, 4, 1))) - 1
+            b = index("0123456789abcdef", tolower(substr(s, 5, 1))) * 16 - 16 + index("0123456789abcdef", tolower(substr(s, 6, 1))) - 1
+            mx = r > g ? (r > b ? r : b) : (g > b ? g : b); mn = r < g ? (r < b ? r : b) : (g < b ? g : b); d = mx - mn
+            if (d == 0) return 0
+            if (mx == r) h = (g - b) / d; else if (mx == g) h = 2 + (b - r) / d; else h = 4 + (r - g) / d
+            h *= 60; return h < 0 ? h + 360 : h
+        }
+        BEGIN { d = hue(a) - hue(b); if (d < 0) d = -d; if (d > 180) d = 360 - d; exit d >= 20 ? 0 : 1 }' || return 0
     su -c "dumpsys input_method | grep -q 'mInputShown=true'" 2>/dev/null && return 0
-    slot=$(( (now / 60) % 2 ))
+    slot=$(( 1 - ${4:-1} ))
     name="user_theme_package_00999999999999${slot}_00.zip"
     python3 "$dir/koiros-keyboard.py" "$1" "$dir/koiros-keyboard.zip" || return 0
     su -c "owner=\$(stat -c %U $gboard/files) && label=\$(ls -Zd $gboard/files | awk '{print \$1}') \
@@ -54,7 +67,7 @@ keyboard() {
         && if grep -q 'name=\"additional_keyboard_theme\"' $gprefs; then \
              sed -i 's#<string name=\"additional_keyboard_theme\">[^<]*</string>#<string name=\"additional_keyboard_theme\">files:$name</string>#' $gprefs; \
            else sed -i 's#</map>#    <string name=\"additional_keyboard_theme\">files:$name</string>\n</map>#' $gprefs; fi" >/dev/null 2>&1 \
-        && echo "$now" > "$stamp"
+        && echo "$now $1 $slot" > "$stamp"
 }
 keyboard_restore() {
     command -v su >/dev/null 2>&1 || return 0

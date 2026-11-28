@@ -175,6 +175,8 @@ public final class PondWallpaperService extends WallpaperService {
          */
         private void followTheme() {
             if (isPreview() || dayHandler == null || !themeFollow) return;
+            // Battery Saver or a low, unplugged battery: the theme holds still.
+            if (powerSave || sleepy) return;
             long now = SystemClock.uptimeMillis();
             if (now - themeCheckedAt < THEME_CHECK_MS) return;
             themeCheckedAt = now;
@@ -188,7 +190,7 @@ public final class PondWallpaperService extends WallpaperService {
             final int second = ThemeFollower.neon(themeGlide[1]), third = ThemeFollower.neon(themeGlide[2]);
             dayHandler.post(() -> ThemeWriter.apply(PondWallpaperService.this, seed, second, third));
         }
-        private static final long THEME_CHECK_MS = 5000;
+        private static final long THEME_CHECK_MS = 10000;
         private final ThemeFollower follower = new ThemeFollower();
         private final double[] themeHues = new double[3], themeGlide = new double[3];
         private long themeCheckedAt;

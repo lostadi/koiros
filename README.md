@@ -32,7 +32,7 @@ moment—a name for forms unfolding in their own time.
 
 ## Install and make it yours
 
-1. On an Android device, open the [latest release](https://github.com/lostadi/koiros/releases/latest) and download **Koiros-3.4.apk** from Assets, or take [`apk/Koiros-3.4.apk`](apk/Koiros-3.4.apk) straight from this repository. It holds both models: the Emergent lattice (the default) and the Classic koi forms, under **Model**.
+1. On an Android device, open the [latest release](https://github.com/lostadi/koiros/releases/latest) and download **Koiros-3.4.1.apk** from Assets, or take [`apk/Koiros-3.4.1.apk`](apk/Koiros-3.4.1.apk) straight from this repository. It holds both models: the Emergent lattice (the default) and the Classic koi forms, under **Model**.
 2. Open the APK. If Android asks, allow that browser or file manager to install apps, then install Koiros.
 3. Open **Koiros**, adjust the preview, and tap **Set wallpaper**. Confirm in Android’s wallpaper picker.
 

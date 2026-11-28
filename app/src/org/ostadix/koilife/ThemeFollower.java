@@ -19,8 +19,10 @@ package org.ostadix.koilife;
  */
 final class ThemeFollower {
     static final int BUCKETS = 36;
-    static final double SEPARATION = 50, MIN_STEP = 5, MAX_STEP = 9, GLIDE_SECONDS = 120;
-    static final long MIN_INTERVAL_MS = 20000;
+    static final double SEPARATION = 50, MIN_STEP = 8, MAX_STEP = 14, GLIDE_SECONDS = 180;
+    // Every change restyles every open app, the costliest part for the battery:
+    // at most one a minute, and only while the wallpaper is showing.
+    static final long MIN_INTERVAL_MS = 60000;
     private static final double SPREAD = 25;
 
     private final double[] weight = new double[BUCKETS], sin = new double[BUCKETS], cos = new double[BUCKETS];
