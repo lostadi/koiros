@@ -236,6 +236,35 @@ public final class MainActivity extends Activity {
         appsNote.setOnClickListener(v -> openAccessibility());
         controls.addView(appsNote);
         homeSwitch = apps; homeNoteView = appsNote;
+        Switch theme = new Switch(this);
+        theme.setText("Theme follows the wallpaper");
+        theme.setTextColor(TEXT);
+        theme.setChecked(settings.themeFollow());
+        TextView themeNote = text(themeNote(theme.isChecked()), 12, MUTED);
+        theme.setOnCheckedChangeListener((button, checked) -> {
+            settings.prefs.edit().putBoolean("theme_follow", checked).apply();
+            if (!checked) {
+                // Put the person's own theme back, off the main thread.
+                new Thread(() -> ThemeWriter.restore(getApplicationContext()), "KoirosTheme").start();
+            }
+            themeNote.setText(themeNote(checked));
+        });
+        controls.addView(theme, new LinearLayout.LayoutParams(-1, dp(48)));
+        controls.addView(themeNote);
+        themeSwitchNote = themeNote; themeSwitch = theme;
+    }
+    private Switch themeSwitch;
+    private TextView themeSwitchNote;
+    private String themeNote(boolean wanted) {
+        boolean system = ThemeWriter.canWrite(this), termux = ThemeWriter.canTellTermux(this);
+        if (!system && !termux) {
+            return "Your phone's colours, keyboard and Termux can follow the pond's colours. Android lets an app set the "
+                + "theme only after a computer or root allows it: pm grant " + getPackageName()
+                + " android.permission.WRITE_SECURE_SETTINGS";
+        }
+        if (!wanted) return "Off. Your own theme is back.";
+        return "On: " + (system ? "system colours" : "") + (system && termux ? " and " : "") + (termux ? "Termux" : "")
+            + " follow the pond's colours, at most about once a minute, while the wallpaper is showing.";
     }
     private Switch homeSwitch;
     private TextView homeNoteView;
@@ -338,7 +367,7 @@ public final class MainActivity extends Activity {
         TextView t = new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(color); return t;
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
-    @Override protected void onResume() { super.onResume(); if (preview != null) preview.start(); refreshHomeSwitch(); }
+    @Override protected void onResume() { super.onResume(); if (preview != null) preview.start(); refreshHomeSwitch(); if (themeSwitchNote != null) themeSwitchNote.setText(themeNote(themeSwitch.isChecked())); }
     @Override protected void onPause() { if (preview != null) preview.stop(); super.onPause(); }
     @Override protected void onDestroy() { if (preview != null) preview.dispose(); super.onDestroy(); }
 

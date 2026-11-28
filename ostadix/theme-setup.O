@@ -1,0 +1,67 @@
+python^(
+# Koiros 3.3: let the phone's theme and Termux follow the wallpaper.
+#
+# Run from the Koiros repository root, on the phone, in Termux, with root:
+#     O ostadix/theme-setup.O
+# Steps: install the newest signed APK, grant Koiros the two optional
+# permissions (system theme seed; Termux recolouring), allow Termux to take
+# Koiros's command, install the Termux colours script, and check that
+# Android's own Material You engine is on. Every change is reported, and the
+# person's settings are backed up before they are touched.
+import json
+import pathlib
+import re
+import shutil
+import subprocess
+import time
+
+root = pathlib.Path.cwd()
+if not (root / "tools/termux/koiros-colors.sh").is_file():
+    raise RuntimeError("Run this Ostadix program from the Koiros repository root")
+home = pathlib.Path.home()
+backups = home / "work/backups"
+backups.mkdir(parents=True, exist_ok=True)
+stamp = time.strftime("%Y%m%d-%H%M%S")
+done = []
+
+def su(command):
+    result = subprocess.run(["su", "-c", command], capture_output=True, text=True)
+    return result.returncode, (result.stdout + result.stderr).strip()
+
+apks = sorted((root / "dist").glob("Koiros-*[0-9].apk"), key=lambda p: [int(x) for x in re.findall(r"\d+", p.stem)])
+if not apks:
+    raise RuntimeError("No signed APK in dist/; build first")
+apk = apks[-1]
+staged = "/data/local/tmp/" + apk.name
+code, out = su(f"cp '{apk}' {staged} && pm install -r {staged}; rm -f {staged}")
+if "Success" not in out:
+    raise RuntimeError("Install failed: " + out)
+done.append("installed " + apk.name)
+
+for permission in ("android.permission.WRITE_SECURE_SETTINGS", "com.termux.permission.RUN_COMMAND"):
+    code, out = su(f"pm grant org.ostadix.koilife {permission}")
+    done.append(("granted " if code == 0 else "could not grant ") + permission + ("" if code == 0 else ": " + out))
+
+props = home / ".termux/termux.properties"
+text = props.read_text() if props.exists() else ""
+if not re.search(r"^\s*allow-external-apps\s*=\s*true", text, re.M):
+    if props.exists():
+        shutil.copy2(props, backups / f"termux.properties.{stamp}")
+    text = re.sub(r"^\s*#\s*allow-external-apps\s*=.*$", "", text, flags=re.M).rstrip("\n")
+    props.write_text(text + "\n\n# Koiros: lets apps holding Termux's RUN_COMMAND permission (granted only to Koiros) run a command.\nallow-external-apps = true\n")
+    done.append("allowed RUN_COMMAND in termux.properties")
+
+script = home / ".termux/koiros-colors.sh"
+shutil.copy2(root / "tools/termux/koiros-colors.sh", script)
+script.chmod(0o700)
+done.append("installed " + str(script))
+subprocess.run(["termux-reload-settings"], capture_output=True)
+
+code, theme = su("settings get secure theme_customization_overlay_packages")
+(backups / f"theme-{stamp}.json").write_text(theme + "\n")
+code, ui = su("dumpsys activity service com.android.systemui/.SystemUIService ThemeOverlayController")
+monet = "mIsMonetEnabled=true" in ui
+done.append("Material You engine " + ("on" if monet else "OFF: another theming app is overriding it"))
+
+__oval_result__ = {"ok": monet, "steps": done, "theme_backup": str(backups / f"theme-{stamp}.json")}
+)_python

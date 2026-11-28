@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3 — Your phone takes the pond's colours
+
+- **Theme follows the wallpaper.** Koiros reads which colours the pond is showing (each dot weighted by how brightly it is drawn; for the classic model, each creature by its size) and sets Android's Material You seed to the strongest one, in the lattice's own neon with the Vibrant style. The system bars, Settings, the keyboard and every app that uses Material You colours follow. The theme moves only when the main colour has shifted at least 14 degrees, and at most every 45 seconds, because each change restyles every open app. Previews never touch it.
+- **Termux follows too.** Koiros asks Termux to run `~/.termux/koiros-colors.sh` with the pond's three strongest colours: the main one tints the background, text and cursor, and the sixteen terminal colours keep their meanings in the lattice's neon.
+- **Your own theme comes back.** Turning off **Theme follows the wallpaper** restores the theme and Termux colours you had before.
+- Both need permissions Android grants only from a computer or with root: `WRITE_SECURE_SETTINGS` for the system theme, and Termux's `RUN_COMMAND` (with `allow-external-apps = true`). `ostadix/theme-setup.O` installs the APK, grants both, installs the Termux script and checks the theme engine. Without them Koiros changes nothing.
+
 ## 3.2 — Dots meet your apps
 
 - **Collisions with the home screen.** With **Collide with my apps** on, the dots treat the icons, folders, widgets, dock and search bar on your home screen as solid. A dot that reaches one is moved back to its surface and rebounds, and a swimmer heading into it turns away, so bodies flow and break around your apps. Icons are round, their names are pills below them, and widgets keep their rounded shapes; shapes follow the home pages as you scroll, and collisions pause on the lock screen.

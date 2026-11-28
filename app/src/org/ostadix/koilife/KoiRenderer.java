@@ -236,6 +236,13 @@ public final class KoiRenderer implements Pond {
         world.setAutoReseed(autoReseed);
     }
     /** Independent appearance clocks; Life always keeps its selected 1/4 Hz rate. */
+    /** Each creature's body colour, as much as its size. */
+    @Override public void showColors(ThemeFollower follower) {
+        for (int k = 0; k < activeCreatureCount; k++) {
+            int c = activeCreatures[k];
+            follower.add(bodyHue[c], Math.max(1e-3, bodyRadius[c] * bodyRadius[c]));
+        }
+    }
     public void setAnimationSpeeds(double motion, double form, double color) {
         motionSpeed = bounded(motion, .02, 2.0);
         formSpeed = bounded(form, .02, 2.0);

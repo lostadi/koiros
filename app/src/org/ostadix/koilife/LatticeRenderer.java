@@ -194,6 +194,12 @@ public final class LatticeRenderer implements Pond {
         world.setRate(rate);
         world.setAutoReseed(autoReseed);
     }
+    /** Each drawn dot in its own colour, as bright as it is drawn; heat is passing, so left out. */
+    @Override public void showColors(ThemeFollower follower) {
+        for (int i = 0, n = dots.getCount(); i < n; i++) {
+            if (visibleDot[i] && dots.redness[i] < .3) follower.add(214 + dots.hue[i], dotLight[i]);
+        }
+    }
     @Override public void setAnimationSpeeds(double motion, double form, double color) {
         motionSpeed = bounded(motion, .02, 2.0);
         formSpeed = bounded(form, .02, 2.0);

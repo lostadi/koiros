@@ -19,6 +19,8 @@ interface Pond {
     void touch(double u, double v);
     /** The home screen's apps as solid shapes, or null. Forms that do not collide ignore it. */
     default void setHome(HomeLayout layout, double shiftPx) { }
+    /** Adds the colours now drawn to the follower: on-screen hues and how much of each shows. */
+    default void showColors(ThemeFollower follower) { }
     /** A finger moving over the wallpaper: screen fractions, and screen fractions per second. */
     void stir(double u, double v, double velocityU, double velocityV);
     /** A companion touch in normalized screen coordinates; kind is one of TOUCH_*. */

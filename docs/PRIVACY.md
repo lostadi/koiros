@@ -50,6 +50,13 @@ The shapes stay in memory only, are never written to storage, and are cleared
 when you turn the reader off. Koiros reads the launcher at most four times a
 second, and only after the launcher reports a change.
 
+## Theme follows the wallpaper (optional)
+
+With the permissions below granted, Koiros writes one system setting, `theme_customization_overlay_packages`, the same one Android's own colour picker writes, holding only a seed colour taken from the wallpaper. The theme that was there before is kept in Koiros's app storage and written back when the switch is turned off. Koiros also asks Termux to run `~/.termux/koiros-colors.sh` with three colours; nothing else is sent to Termux, and nothing leaves the phone.
+
+- `WRITE_SECURE_SETTINGS` can be granted only from a computer (`adb shell pm grant org.ostadix.koilife android.permission.WRITE_SECURE_SETTINGS`) or with root. Revoke it with `pm revoke`.
+- `com.termux.permission.RUN_COMMAND` lets Koiros run that one script. It also needs `allow-external-apps = true` in `~/.termux/termux.properties`, which lets any app holding this permission run Termux commands; only apps you grant it to can.
+
 ## Permissions and diagnostics
 
 - `SET_WALLPAPER` opens Android's wallpaper setup flow. The wallpaper service is

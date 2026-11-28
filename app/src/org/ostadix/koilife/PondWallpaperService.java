@@ -81,6 +81,7 @@ public final class PondWallpaperService extends WallpaperService {
             renderer = settings.createPond(seed);
             settings.configure(renderer);
             homeCollisions = settings.homeCollisions();
+            themeFollow = settings.themeFollow();
             settings.prefs.registerOnSharedPreferenceChangeListener(this);
             // Companion memory lives apart from the settings, so remembering
             // never triggers a reconfiguration.
@@ -167,6 +168,31 @@ public final class PondWallpaperService extends WallpaperService {
             }
             renderer.setHome(layout, layout == null ? 0 : layout.pageShift(HomeLayout.liveOffset, HomeLayout.liveStep, width));
         }
+        /**
+         * Every few seconds of drawing, reads the colours on screen; when they have
+         * moved far enough, the phone's theme and Termux follow, written on the
+         * background thread. Previews never touch the theme.
+         */
+        private void followTheme() {
+            if (isPreview() || dayHandler == null || !themeFollow) return;
+            long now = SystemClock.uptimeMillis();
+            if (now - themeCheckedAt < THEME_CHECK_MS) return;
+            themeCheckedAt = now;
+            if (!ThemeWriter.canWrite(PondWallpaperService.this) && !ThemeWriter.canTellTermux(PondWallpaperService.this)) return;
+            follower.reset();
+            renderer.showColors(follower);
+            int found = follower.peaks(themeHues);
+            if (found == 0 || !follower.due(themeHues[0], now)) return;
+            final int seed = ThemeFollower.neon(themeHues[0]);
+            final int second = ThemeFollower.neon(found > 1 ? themeHues[1] : themeHues[0] + 120);
+            final int third = ThemeFollower.neon(found > 2 ? themeHues[2] : themeHues[0] - 120);
+            dayHandler.post(() -> ThemeWriter.apply(PondWallpaperService.this, seed, second, third));
+        }
+        private static final long THEME_CHECK_MS = 5000;
+        private final ThemeFollower follower = new ThemeFollower();
+        private final double[] themeHues = new double[3];
+        private long themeCheckedAt;
+        private boolean themeFollow = true;
         private long keyguardCheckedAt;
         private boolean locked, homeCollisions = true;
         @Override public void onOffsetsChanged(float xOffset, float yOffset,
@@ -262,6 +288,9 @@ public final class PondWallpaperService extends WallpaperService {
             }
             settings.configure(renderer);
             homeCollisions = settings.homeCollisions();
+            boolean follow = settings.themeFollow();
+            if (follow && !themeFollow) { follower.forget(); themeCheckedAt = 0; }
+            themeFollow = follow;
             schedule();
         }
         @Override public void onTouchEvent(MotionEvent event) {
@@ -438,6 +467,7 @@ public final class PondWallpaperService extends WallpaperService {
                     passHome(canvas.getWidth());
                     renderer.render(canvas, dt);
                     frames++; drawn = true;
+                    followTheme();
                 }
             } catch (IllegalStateException | IllegalArgumentException e) {
                 Log.w("KoiLife", "Surface unavailable: " + e.getClass().getSimpleName());

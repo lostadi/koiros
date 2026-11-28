@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.ostadix.koilife" android:versionCode="13" android:versionName="3.2">
+    package="org.ostadix.koilife" android:versionCode="14" android:versionName="3.3">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Know my day: which apps were used, read on the phone only. Koiros has no
          internet permission, so this information cannot leave the device. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Theme follows the wallpaper (3.3), both optional and granted by the person:
+         set Material You's seed colour (granted from a computer or with root), and
+         ask Termux to recolour itself. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-feature android:name="android.software.live_wallpaper" android:required="true" />
     <application android:label="Koiros" android:icon="@drawable/pond_icon"
         android:theme="@style/AppTheme" android:allowBackup="true"

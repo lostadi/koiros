@@ -32,7 +32,7 @@ moment—a name for forms unfolding in their own time.
 
 ## Install and make it yours
 
-1. On an Android device, open the [latest release](https://github.com/lostadi/koiros/releases/latest) and download **Koiros-3.2.apk** from Assets, or take [`apk/Koiros-3.2.apk`](apk/Koiros-3.2.apk) straight from this repository. It holds both models: the Emergent lattice (the default) and the Classic koi forms, under **Model**.
+1. On an Android device, open the [latest release](https://github.com/lostadi/koiros/releases/latest) and download **Koiros-3.3.apk** from Assets, or take [`apk/Koiros-3.3.apk`](apk/Koiros-3.3.apk) straight from this repository. It holds both models: the Emergent lattice (the default) and the Classic koi forms, under **Model**.
 2. Open the APK. If Android asks, allow that browser or file manager to install apps, then install Koiros.
 3. Open **Koiros**, adjust the preview, and tap **Set wallpaper**. Confirm in Android’s wallpaper picker.
 
@@ -60,6 +60,7 @@ The sliders reach **0.02×** for very gradual motion.
 - **Unison:** dots move to their own rhythm, so a body in step strokes and swells as one, with waves from its core. A slowly turning projection from two hidden dimensions makes forces come and go.
 - **Touch:** drag to move and fling dots; tap and they startle outward in one bright beat.
 - **Your apps are solid:** with **Collide with my apps**, dots bounce off the icons, folders, widgets and dock on your home screen, and bodies flow around them. It needs the optional *Koiros app collisions* reader in Accessibility settings, which reads only your launcher and keeps only shapes.
+- **Your phone takes its colours:** with **Theme follows the wallpaper**, Android's Material You theme (system bars, keyboard, Settings and Material apps) and Termux follow the pond's strongest colours as they drift. It needs two permissions granted from a computer or root; `O ostadix/theme-setup.O` sets everything up.
 - **The whole screen:** bodies spread over all of it, start in a random arrangement every time, and look three-dimensional: near bodies larger and brighter, tilted like galaxies, with home-page parallax.
 
 **Classic forms:**

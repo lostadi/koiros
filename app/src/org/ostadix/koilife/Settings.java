@@ -39,6 +39,8 @@ final class Settings {
     boolean modelChanged(Pond pond) { return (pond instanceof LatticeRenderer) != lattice(); }
     /** New in 3.2: dots collide with the apps on the home screen (needs the layout reader enabled). */
     boolean homeCollisions() { return prefs.getBoolean("home_collisions", true); }
+    /** New in 3.3: the phone's theme follows the pond's colours (when Koiros may set it). */
+    boolean themeFollow() { return prefs.getBoolean("theme_follow", true); }
     boolean touchRipples() { return prefs.getBoolean("touch_ripples", true); }
     boolean autoReseed() { return prefs.getBoolean("auto_reseed", true); }
     void newSeed() { prefs.edit().putLong("seed", new SecureRandom().nextLong()).apply(); }
